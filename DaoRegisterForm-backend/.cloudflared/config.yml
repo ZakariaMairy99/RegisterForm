@@ -1,0 +1,23 @@
+# cloudflared config for the "dao-register-backend" tunnel
+# IMPORTANT: replace <TUNNEL_ID> and <USERNAME> with the values from your environment.
+# - Get the tunnel id with: cloudflared tunnel list
+# - The credentials file is created when you run `cloudflared tunnel create <name>`
+
+# Example:
+# tunnel: 1234abcd-5678-ef00-1234-abcdef123456
+# credentials-file: C:\Users\zakaria\.cloudflared\1234abcd-5678-ef00-1234-abcdef123456.json
+
+# Replace the placeholders below before running the tunnel.
+
+tunnel: 250cd996-3fa3-46bf-981a-033ecf844f65
+credentials-file: C:\Users\ACER\.cloudflared\250cd996-3fa3-46bf-981a-033ecf844f65.json
+
+ingress:
+  - hostname: registerformdemo.com
+    service: https://localhost:3001
+    originRequest:
+      # If your local dev server uses a self-signed certificate set this to true
+      noTLSVerify: true
+
+  # Default rule (return 404 for all other hostnames)
+  - service: http_status:404

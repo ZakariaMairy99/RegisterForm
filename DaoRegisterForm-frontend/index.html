@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Portail Fournisseur</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+      /* DESIGN SYSTEM - VARIABLES
+         Changez les codes couleurs ici pour modifier l'apparence de toute l'application
+      */
+      :root {
+        /* Couleurs principales (Format RGB pour gérer l'opacité via Tailwind) */
+        --rgb-primary: 52 58 64;       /* Dark Principal (blue-600) */
+        --rgb-secondary: 17 24 39;      /* Gris Foncé / Noir (gray-900) */
+        --rgb-success: 22 163 74;       /* Vert Succès (green-600) */
+        
+        /* Texte */
+        --rgb-text-main: 17 24 39;      /* Texte Principal */
+        --rgb-text-muted: 107 114 128;  /* Texte Secondaire (gray-500) */
+
+        /* Arrière-plans & Bordures spécifiques */
+        --color-background: #f8fafc;    /* Fond de la page (slate-50) */
+        --color-surface: #ffffff;       /* Fond des cartes/conteneurs */
+        --color-primary-light: #eff6ff; /* Fond léger primaire (blue-50) */
+        --color-primary-border: #bfdbfe;/* Bordure primaire légère (blue-200) */
+        --color-border: #e2e8f0;        /* Bordure standard (gray-200) */
+      }
+
+      body { font-family: 'Roboto', sans-serif; }
+      
+      /* Custom scrollbar */
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: #f1f1f1; }
+      ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: #555; }
+    </style>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              // Mapping des classes Tailwind vers les variables CSS
+              primary: {
+                DEFAULT: 'rgb(var(--rgb-primary) / <alpha-value>)',
+                light: 'var(--color-primary-light)',
+                border: 'var(--color-primary-border)',
+              },
+              secondary: {
+                DEFAULT: 'rgb(var(--rgb-secondary) / <alpha-value>)',
+              },
+              success: {
+                DEFAULT: 'rgb(var(--rgb-success) / <alpha-value>)',
+              },
+              text: {
+                main: 'rgb(var(--rgb-text-main) / <alpha-value>)',
+                muted: 'rgb(var(--rgb-text-muted) / <alpha-value>)',
+              },
+              app: {
+                bg: 'var(--color-background)',
+                surface: 'var(--color-surface)',
+                border: 'var(--color-border)',
+              }
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-out forwards',
+              'scale-in': 'scaleIn 0.4s ease-out forwards',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              scaleIn: {
+                '0%': { opacity: '0', transform: 'scale(0.9)' },
+                '100%': { opacity: '1', transform: 'scale(1)' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.2.0",
+    "react-dom": "https://esm.sh/react-dom@19.2.0"
+  }
+}
+</script>
+  </head>
+  <body class="bg-app-bg text-text-main h-screen overflow-hidden">
+    <div id="root" class="h-full w-full"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
