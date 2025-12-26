@@ -16,16 +16,25 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
 
-// SSL Certificate
-const httpsOptions = {
-  key: fs.readFileSync(path.join(__dirname, 'certs', 'localhost.key')),
-  cert: fs.readFileSync(path.join(__dirname, 'certs', 'localhost.crt'))
-};
+// SSL Certificate (only for local development)
+let httpsOptions = {};
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    httpsOptions = {
+      key: fs.readFileSync(path.join(__dirname, 'certs', 'localhost.key')),
+      cert: fs.readFileSync(path.join(__dirname, 'certs', 'localhost.crt'))
+    };
+  } catch (e) {
+    console.warn('⚠️ Certificates not found, HTTPS might fail locally.');
+  }
+}
 
 // Salesforce OAuth 2.0 Configuration
 const CLIENT_ID = process.env.SALESFORCE_CLIENT_ID;
 const CLIENT_SECRET = process.env.SALESFORCE_CLIENT_SECRET;
-const REDIRECT_URI = `https://${process.env.HOST}:${process.env.PORT}/oauth/callback`;
+const REDIRECT_URI = process.env.PUBLIC_URL 
+  ? `${process.env.PUBLIC_URL}/oauth/callback` 
+  : `https://${process.env.HOST}:${process.env.PORT}/oauth/callback`;
 
 // Initialize jsforce connection
 const conn = new jsforce.Connection({
@@ -645,15 +654,21 @@ app.use((err, req, res, next) => {
     success: false,
     error: 'Internal server error'
   });
-});
-
-// Start HTTPS server
-https.createServer(httpsOptions, app).listen(PORT, HOST, () => {
-  console.log(`\n🚀 HTTPS Server is running on https://${HOST}:${PORT}`);
-  console.log(`\n📋 OAuth Flow:`);
-  console.log(`   Login: https://${HOST}:${PORT}/login`);
-  console.log(`\n📡 API Endpoints:`);
-  console.log(`   POST https://${HOST}:${PORT}/api/supplier`);
+});Server (HTTP in production, HTTPS in dev)
+if (process.env.NODE_ENV === 'production') {
+  app.listen(PORT, () => {
+    console.log(`\n🚀 Server is running on port ${PORT}`);
+  });
+} else {
+  https.createServer(httpsOptions, app).listen(PORT, HOST, () => {
+    console.log(`\n🚀 HTTPS Server is running on https://${HOST}:${PORT}`);
+    console.log(`\n📋 OAuth Flow:`);
+    console.log(`   Login: https://${HOST}:${PORT}/login`);
+    console.log(`\n📡 API Endpoints:`);
+    console.log(`   POST https://${HOST}:${PORT}/api/supplier`);
+    console.log(`\n⚠️  Note: Login first at /login before submitting forms!`);
+  });
+}onsole.log(`   POST https://${HOST}:${PORT}/api/supplier`);
   console.log(`\n⚠️  Note: Login first at /login before submitting forms!`);
 });
 
