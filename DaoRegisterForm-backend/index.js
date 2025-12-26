@@ -654,7 +654,9 @@ app.use((err, req, res, next) => {
     success: false,
     error: 'Internal server error'
   });
-});Server (HTTP in production, HTTPS in dev)
+});
+
+// Start Server (HTTP in production, HTTPS in dev)
 if (process.env.NODE_ENV === 'production') {
   app.listen(PORT, () => {
     console.log(`\n🚀 Server is running on port ${PORT}`);
@@ -668,8 +670,6 @@ if (process.env.NODE_ENV === 'production') {
     console.log(`   POST https://${HOST}:${PORT}/api/supplier`);
     console.log(`\n⚠️  Note: Login first at /login before submitting forms!`);
   });
-}onsole.log(`   POST https://${HOST}:${PORT}/api/supplier`);
-  console.log(`\n⚠️  Note: Login first at /login before submitting forms!`);
-});
+}
 
 module.exports = app;
