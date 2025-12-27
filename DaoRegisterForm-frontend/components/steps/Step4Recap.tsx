@@ -65,15 +65,25 @@ export const Step4Recap: React.FC<StepProps> = ({ data, onConfirm, isSubmitting,
             {renderRecapItem("Pays", data.country, 'country')}
             {renderRecapItem("Raison sociale", data.raisonSociale, 'raisonSociale')}
             {renderRecapItem("Nom Commercial", data.nomCommercial, 'nomCommercial')}
-            {renderRecapItem("Forme juridique", data.formeJuridique, 'formeJuridique')}
-            {renderRecapItem("ICE / DUNS", data.ice, 'ice')}
-            {renderRecapItem("SIRET", data.siret, 'siret')}
-            {renderRecapItem("TVA", data.tva, 'tva')}
+            {renderRecapItem("Forme juridique", data.formeJuridique === 'AUTRE' ? data.formeJuridiqueAutre || 'AUTRE' : data.formeJuridique, 'formeJuridique')}
+            {data.country === 'MAROC' && (
+              <>
+                {renderRecapItem("ICE / DUNS", data.ice, 'ice')}
+                {renderRecapItem("Numéro de registre du commerce", data.rc, 'rc')}
+                {renderRecapItem("Identifiant fiscal", data.identifiantFiscal, 'identifiantFiscal')}
+              </>
+            )}
+            {data.country === 'ETRANGER' && (
+              <>
+                {renderRecapItem("SIRET", data.siret, 'siret')}
+                {renderRecapItem("TVA", data.tva, 'tva')}
+              </>
+            )}
             {renderRecapItem("Adresse", data.address, 'address')}
             {renderRecapItem("Code Postal", data.postalCode, 'postalCode')}
             {renderRecapItem("Ville", data.city, 'city')}
             {renderRecapItem("Téléphone", data.phone, 'phone')}
-            {renderRecapItem("Fax", data.fax, 'fax')}
+            {renderRecapItem("Fax pro", data.fax, 'fax')}
             {renderRecapItem("Site web", data.website, 'website')}
             {renderRecapItem("Email entreprise", data.emailEntreprise, 'emailEntreprise')}
           </div>
@@ -90,7 +100,7 @@ export const Step4Recap: React.FC<StepProps> = ({ data, onConfirm, isSubmitting,
             {renderRecapItem("Nom complet", `${data.contactPrenom} ${data.contactNom}`, 'contactNom')}
             {renderRecapItem("Civilité", data.civility, 'civility')}
             {renderRecapItem("Mobile", data.contactMobile, 'contactMobile')}
-            {renderRecapItem("Fix", data.fix, 'fix')}
+            {renderRecapItem("Téléphone professionnel", data.otherPhone, 'otherPhone')}
           </div>
         </div>
 

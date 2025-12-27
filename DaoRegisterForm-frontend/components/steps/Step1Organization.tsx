@@ -31,6 +31,7 @@ export const Step1Organization: React.FC<StepProps> = ({ data, update, errors })
           onChange={e => update('raisonSociale', e.target.value)}
           error={errors?.raisonSociale}
         />
+        
         <Input 
           label="Nom Commercial" 
           value={data.nomCommercial}
@@ -59,11 +60,19 @@ export const Step1Organization: React.FC<StepProps> = ({ data, update, errors })
           onChange={e => update('formeJuridique', e.target.value)}
           error={errors?.formeJuridique}
         />
+        {data.formeJuridique === 'AUTRE' && (
+          <Input
+            label="Précisez la forme juridique"
+            value={data.formeJuridiqueAutre}
+            onChange={e => update('formeJuridiqueAutre', e.target.value)}
+            maxLength={255}
+            error={errors?.formeJuridiqueAutre}
+          />
+        )}
       </div>
 
       {/* Country Section */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-5">
-        <h3 className="text-sm font-bold text-blue-900 mb-3">Localisation</h3>
+      <div className="bg-app-surface border border-app-border rounded-lg p-4 mb-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4">
           <Select 
             label="Pays" 
@@ -72,6 +81,7 @@ export const Step1Organization: React.FC<StepProps> = ({ data, update, errors })
             onChange={e => update('country', e.target.value)}
           />
           {showIce && (
+            <>
             <Input 
               label="ICE" 
               value={data.ice}
@@ -83,7 +93,23 @@ export const Step1Organization: React.FC<StepProps> = ({ data, update, errors })
               }}
               maxLength={18}
               inputMode="numeric"
-              pattern="\d*"
+              pattern="\\d*"
+            />
+            <Input 
+              label="Numéro de registre du commerce" 
+              value={data.rc}
+              onChange={e => update('rc', e.target.value)}
+              maxLength={255}
+            />
+            </>
+          )}
+          {showIce && (
+            <Input
+              label="Identifiant fiscal"
+              value={data.identifiantFiscal}
+              onChange={e => update('identifiantFiscal', e.target.value)}
+              maxLength={255}
+              error={errors?.identifiantFiscal}
             />
           )}
           {showTvaAndSiret && (
@@ -137,12 +163,12 @@ export const Step1Organization: React.FC<StepProps> = ({ data, update, errors })
         <Input 
           label="Téléphone" 
           type="tel"
-          helperText='Précédé de "+" et de l indicatif pays, sans espace'
           value={data.phone}
           onChange={e => update('phone', e.target.value)}
+          error={errors?.phone}
         />
         <Input 
-          label="Fax" 
+          label="Fax pro" 
           type="tel"
           value={data.fax}
           onChange={e => update('fax', e.target.value)}

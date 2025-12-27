@@ -5,9 +5,9 @@ const STORAGE_KEY = 'supplierFormState';
 
 // File upload security settings (client-side)
 const MAX_FILE_SIZE = Number(import.meta.env.VITE_MAX_UPLOAD_BYTES) || 5 * 1024 * 1024; // 5 MB default
-// Only allow PDFs client-side
-const ALLOWED_EXTENSIONS = ['.pdf'];
-const ALLOWED_MIME_PREFIXES = ['application/pdf'];
+// Allowed file types client-side (match backend permissive list)
+const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xls', '.xlsx', '.csv', '.txt', '.tiff'];
+const ALLOWED_MIME_PREFIXES = ['application/', 'image/', 'text/'];
 
 // Load saved state from localStorage
 const loadSavedState = (): { formData: SupplierFormData; currentStep: number } | null => {
@@ -200,6 +200,8 @@ export const useSupplierForm = () => {
         // Organization - required fields (those with asterisks)
         if (!formData.raisonSociale || formData.raisonSociale.trim() === '') errs.raisonSociale = 'Raison sociale est requise';
         if (!formData.formeJuridique || formData.formeJuridique.trim() === '') errs.formeJuridique = 'Forme juridique est requise';
+        // If user selected 'AUTRE', require the custom text
+        if (formData.formeJuridique === 'AUTRE' && (!formData.formeJuridiqueAutre || formData.formeJuridiqueAutre.trim() === '')) errs.formeJuridiqueAutre = 'Veuillez préciser la forme juridique';
         if (!formData.address || formData.address.trim() === '') errs.address = 'Adresse est requise';
         if (!formData.postalCode || formData.postalCode.trim() === '') errs.postalCode = 'Code postal est requis';
         if (!formData.city || formData.city.trim() === '') errs.city = 'Ville est requise';
@@ -321,6 +323,11 @@ export const useSupplierForm = () => {
           setFormData(prev => ({ ...prev, nomCommercial: normalizedNomCommercial }));
         }
 
+        // If user selected 'AUTRE' for legal form, use the custom value as the effective legal form
+        const effectiveFormeJuridique = formData.formeJuridique === 'AUTRE'
+          ? (formData.formeJuridiqueAutre && formData.formeJuridiqueAutre.trim() !== '' ? formData.formeJuridiqueAutre : 'AUTRE')
+          : formData.formeJuridique;
+
         // Validate entire form before sending
         const allErrs = validateAll();
         if (Object.keys(allErrs).length > 0) {
@@ -330,15 +337,13 @@ export const useSupplierForm = () => {
           return;
         }
 
-        // Prepare complete payload with all form data
-        const payload = {
-          // Account data
+        // Prepare complete payload with all form data (exclude non-applicable fields by country)
+        const payload: any = {
+          // Account data (common)
           raisonSociale: formData.raisonSociale,
           nomCommercial: normalizedNomCommercial,
-          formeJuridique: formData.formeJuridique,
-          ice: normalizedIce,
-          siret: normalizedSiret,
-          tva: formData.tva,
+          formeJuridique: effectiveFormeJuridique,
+          formeJuridiqueAutre: formData.formeJuridiqueAutre,
           address: formData.address,
           postalCode: formData.postalCode,
           city: formData.city,
@@ -347,7 +352,7 @@ export const useSupplierForm = () => {
           fax: formData.fax,
           website: formData.website,
           emailEntreprise: formData.emailEntreprise,
-          
+
           // Documents
           dateCreation: formData.dateCreation,
           typeEntreprise: formData.typeEntreprise,
@@ -356,7 +361,7 @@ export const useSupplierForm = () => {
           exercicesClos: formData.exercicesClos,
           certifications: formData.certifications,
           hsePolicy: formData.hsePolicy,
-          
+
           // Contact data
           civility: formData.civility,
           contactNom: formData.contactNom,
@@ -364,10 +369,10 @@ export const useSupplierForm = () => {
           email: formData.email,
           contactMobile: formData.contactMobile,
           faxPro: formData.faxPro,
-          fix: formData.fix,
+          otherPhone: formData.otherPhone,
           language: formData.language,
           timezone: formData.timezone,
-          
+
           // Files metadata (file upload would need separate handling)
           files: {
             // Maroc files
@@ -385,6 +390,16 @@ export const useSupplierForm = () => {
             ice_Etranger: formData.filesICE_Etranger.length
           }
         };
+
+        // Attach only country-relevant identifier fields
+        if (formData.country === 'MAROC') {
+          payload.ice = normalizedIce;
+          payload.rc = formData.rc;
+          payload.identifiantFiscal = formData.identifiantFiscal;
+        } else if (formData.country === 'ETRANGER') {
+          payload.siret = normalizedSiret;
+          payload.tva = formData.tva;
+        }
 
         
 
@@ -432,10 +447,8 @@ export const useSupplierForm = () => {
           Object.entries({
             raisonSociale: formData.raisonSociale,
             nomCommercial: normalizedNomCommercial,
-            formeJuridique: formData.formeJuridique,
-            ice: normalizedIce,
-            siret: normalizedSiret,
-            tva: formData.tva,
+            formeJuridique: effectiveFormeJuridique,
+            formeJuridiqueAutre: formData.formeJuridiqueAutre,
             address: formData.address,
             postalCode: formData.postalCode,
             city: formData.city,
@@ -457,12 +470,22 @@ export const useSupplierForm = () => {
             email: formData.email,
             contactMobile: formData.contactMobile,
             faxPro: formData.faxPro,
-            fix: formData.fix,
+            otherPhone: formData.otherPhone,
             language: formData.language,
             timezone: formData.timezone
           }).forEach(([k, v]) => {
             if (v !== undefined && v !== null) form.append(k, String(v));
           });
+
+          // Append country-specific identifier fields
+          if (formData.country === 'MAROC') {
+            form.append('ice', String(normalizedIce || ''));
+            form.append('rc', String(formData.rc || ''));
+            form.append('identifiantFiscal', String(formData.identifiantFiscal || ''));
+          } else if (formData.country === 'ETRANGER') {
+            form.append('siret', String(normalizedSiret || ''));
+            form.append('tva', String(formData.tva || ''));
+          }
 
           // Append files from each category
           const appendFiles = (arr: File[] | undefined, fieldName = 'files', sectionLabel = '') => {
@@ -480,7 +503,7 @@ export const useSupplierForm = () => {
               if (isFileLike) {
                 // Build type label from the section label and use it as the filename (uppercase, no original name)
                 // e.g. sectionLabel 'associes' => 'ASSOCIES.pdf'
-                    const typeLabel = sectionLabel ? String(sectionLabel).toUpperCase() : 'FILE';
+                    const typeLabel = sectionLabel ? String(sectionLabel) : 'FILE';
                 // Include original file extension when sending to backend — e.g. 'ICE.pdf'
                 const originalName = (f as any).name || '';
                 const extMatch = originalName.match(/\.[^\.]+$/);
@@ -496,18 +519,18 @@ export const useSupplierForm = () => {
           };
 
           // Use French section names for uploaded filenames - Maroc files
-          appendFiles(formData.filesAttestationRC, 'files', 'attestation_rc');
-          appendFiles(formData.filesAttestationRIB, 'files', 'attestation_rib');
-          appendFiles(formData.filesAttestationTVA, 'files', 'attestation_tva');
-          appendFiles(formData.filesICE, 'files', 'ice');
-          appendFiles(formData.filesIdentifiantFiscal, 'files', 'identifiant_fiscal');
-          appendFiles(formData.filesPresentationCommerciale, 'files', 'presentation_commerciale');
-          appendFiles(formData.filesStatutMaroc, 'files', 'statut');
+          appendFiles(formData.filesAttestationRC, 'files', 'Attestation RC');
+          appendFiles(formData.filesAttestationRIB, 'files', 'Attestation RIB');
+          appendFiles(formData.filesAttestationTVA, 'files', 'Attestation TVA');
+          appendFiles(formData.filesICE, 'files', 'ICE');
+          appendFiles(formData.filesIdentifiantFiscal, 'files', 'Identifiant Fiscal');
+          appendFiles(formData.filesPresentationCommerciale, 'files', 'Présentation Commerciale');
+          appendFiles(formData.filesStatutMaroc, 'files', 'Statut');
           // Étranger files
-          appendFiles(formData.filesAttestationAT, 'files', 'attestation_at');
-          appendFiles(formData.filesAttestationRC_Etranger, 'files', 'attestation_rc');
-          appendFiles(formData.filesAttestationRIB_Etranger, 'files', 'attestation_rib');
-          appendFiles(formData.filesICE_Etranger, 'files', 'ice');
+          appendFiles(formData.filesAttestationAT, 'files', "Attestation d'assurance (AT)");
+          appendFiles(formData.filesAttestationRC_Etranger, 'files', "Attestation d'assurance (RC)");
+          appendFiles(formData.filesAttestationRIB_Etranger, 'files', 'Attestation RIB');
+          appendFiles(formData.filesICE_Etranger, 'files', 'ICE');
 
           // Log files being sent
           console.log('📎 Fichiers à envoyer:', {

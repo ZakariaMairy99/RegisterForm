@@ -82,7 +82,7 @@ function App() {
               type="button"
               onClick={goToPrevStep}
               disabled={currentStep === 0}
-              className={`px-6 py-3 rounded-xl font-bold transition-all flex items-center gap-2 ${currentStep === 0 ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-800 shadow-sm'}`}
+              className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${currentStep === 0 ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-800 shadow-sm'}`}
             >
               <i className="fas fa-arrow-left text-sm"></i> Précédent
             </button>
@@ -91,7 +91,7 @@ function App() {
               <button 
                 type="button"
                 onClick={goToNextStep}
-                className="px-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-all shadow-lg shadow-gray-900/20 flex items-center gap-2 group"
+                className="px-6 py-2 bg-gray-900 text-white rounded-lg font-semibold hover:bg-black transition-all shadow-md shadow-gray-900/10 flex items-center gap-2 group text-sm"
               >
                 Suivant <i className="fas fa-arrow-right text-sm group-hover:translate-x-1 transition-transform"></i>
               </button>

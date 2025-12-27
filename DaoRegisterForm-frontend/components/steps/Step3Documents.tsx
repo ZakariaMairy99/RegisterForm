@@ -134,13 +134,6 @@ export const Step3Documents: React.FC<StepProps> = ({ data, update, errors }) =>
                 onFilesChange={f => update('filesAttestationRIB_Etranger', f)}
               />
 
-              <FileUpload 
-                id="iceEtranger"
-                label="6. ICE"
-                description="Merci de joindre votre ICE."
-                files={data.filesICE_Etranger}
-                onFilesChange={f => update('filesICE_Etranger', f)}
-              />
             </>
           )}
         </div>
@@ -171,7 +164,20 @@ export const Step3Documents: React.FC<StepProps> = ({ data, update, errors }) =>
         <MultiSelect 
           label="13. Certifications générales"
           description="Merci de sélectionner dans la liste les certifications générales."
-          options={['ISO 9001', 'ISO 14001', 'OHSAS 18001', 'ISO 45001']}
+          options={[
+            'ISO 9001',
+            'ISO 14001',
+            'OHSAS 18001',
+            'ISO 45001',
+            'ISO 27001',
+            'HACCP',
+            'CMMI',
+            'ISO 50001',
+            'IATF 16949',
+            'ISO 20000-1',
+            'ISO 26000',
+            'SA 8000'
+          ]}
           selected={data.certifications}
           onChange={selected => update('certifications', selected)}
         />

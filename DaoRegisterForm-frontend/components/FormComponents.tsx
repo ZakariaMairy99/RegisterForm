@@ -5,21 +5,26 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
   required?: boolean;
   helperText?: string;
+  error?: string | null;
   // When true, display the visual required asterisk next to the label.
   showRequiredIndicator?: boolean;
 }
 
-export const Input: React.FC<InputProps> = ({ label, required, helperText, showRequiredIndicator = false, className = "", ...props }) => (
+export const Input: React.FC<InputProps> = ({ label, required, helperText, error = null, showRequiredIndicator = false, className = "", ...props }) => (
   <div className={`flex flex-col ${className}`}>
     <label className="text-xs font-medium mb-1 text-text-main">
       {label} {required && showRequiredIndicator && <span className="text-red-500">*</span>}
     </label>
     <input
-      className="px-2 py-1.5 border border-gray-300 rounded-md text-xs text-text-main bg-gray-50 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+      className={`px-2 py-1.5 rounded-md text-xs text-text-main bg-gray-50 focus:outline-none transition-all ${error ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-100' : 'border border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20'}`}
       required={required}
       {...props}
     />
-    {helperText && <small className="text-text-muted text-xs mt-0.5">{helperText}</small>}
+    {error ? (
+      <small className="text-red-600 text-xs mt-0.5">{error}</small>
+    ) : (
+      helperText && <small className="text-text-muted text-xs mt-0.5">{helperText}</small>
+    )}
   </div>
 );
 
@@ -124,7 +129,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ id, label, description, 
           type="file"
           ref={inputRef}
           className="hidden"
-          accept=".pdf,application/pdf"
+          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.csv,.txt,.tiff,application/pdf,image/*,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={handleFileSelect}
         />
         <i className="fas fa-cloud-upload-alt text-sm text-primary"></i>

@@ -1,9 +1,5 @@
 {
-<<<<<<< HEAD
-  "name": "Copy of Copy of Supplier Registration Portal v2",
-=======
-  "name": "Supplier Registration Portal ",
->>>>>>> origin/master
+  "name": "Supplier Registration Portal",
   "description": "A multi-step wizard for supplier registration and document submission.",
   "requestFramePermissions": []
 }

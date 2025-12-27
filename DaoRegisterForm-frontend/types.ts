@@ -3,10 +3,13 @@ export interface SupplierFormData {
   country: string;
   raisonSociale: string;
   nomCommercial: string;
+  rc: string;
   formeJuridique: string;
+  formeJuridiqueAutre: string;
   ice: string;
   siret: string;
   tva: string;
+  identifiantFiscal: string;
   address: string;
   postalCode: string;
   city: string;
@@ -21,7 +24,7 @@ export interface SupplierFormData {
   contactPrenom: string;
   contactMobile: string;
   faxPro: string;
-  fix: string;
+  otherPhone: string;
   email: string;
   language: string;
   timezone: string;
@@ -62,10 +65,13 @@ export const INITIAL_DATA: SupplierFormData = {
   country: '',
   raisonSociale: '',
   nomCommercial: '',
+  rc: '',
   formeJuridique: '',
+  formeJuridiqueAutre: '',
   ice: '',
   siret: '',
   tva: '',
+  identifiantFiscal: '',
   address: '',
   postalCode: '',
   city: '',
@@ -78,7 +84,7 @@ export const INITIAL_DATA: SupplierFormData = {
   contactPrenom: '',
   contactMobile: '',
   faxPro: '',
-  fix: '',
+  otherPhone: '',
   email: '',
   language: 'fr',
   timezone: 'WET',

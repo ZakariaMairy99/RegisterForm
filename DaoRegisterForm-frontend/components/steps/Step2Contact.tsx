@@ -56,10 +56,10 @@ export const Step2Contact: React.FC<StepProps> = ({ data, update, errors }) => {
           onChange={e => update('faxPro', e.target.value)}
         />
         <Input 
-          label="Fix" 
+          label="Téléphone professionnel" 
           type="tel"
-          value={data.fix}
-          onChange={e => update('fix', e.target.value)}
+          value={data.otherPhone}
+          onChange={e => update('otherPhone', e.target.value)}
         />
         <Input 
           label="Adresse e-mail principale" 

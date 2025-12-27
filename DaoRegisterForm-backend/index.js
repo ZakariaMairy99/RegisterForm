@@ -47,8 +47,8 @@ const conn = new jsforce.Connection({
 });
 
 // Server-side allowed file settings
-const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xlsx', '.csv', '.txt', '.tiff'];
-const ALLOWED_MIME_PREFIXES = ['application/', 'image/'];
+const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xls', '.xlsx', '.csv', '.txt', '.tiff'];
+const ALLOWED_MIME_PREFIXES = ['application/', 'image/', 'text/'];
 
 // Helper: sanitize filename to a safe token
 function sanitizeFilename(name) {
@@ -265,7 +265,7 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
       
       // Company Information
       Phone: req.body.phone,
-      Fax: req.body.fax,
+      Fax_Pro__c: req.body.fax,
       Website: req.body.website,
       
       // Address
@@ -278,8 +278,10 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
       
       // Custom Fields (adjust field names to match your Salesforce schema)
       DBA__c: req.body.nomCommercial,
+      RC__c: req.body.rc,
       LegalForm__c: req.body.formeJuridique,
       CommonCompanyIdentifier__c: req.body.ice,
+      FiscalIdentifier__c: req.body.identifiantFiscal,
       Siret__c: req.body.siret,
       VATNumberMaroc__c: req.body.tva,
       EmailPrincipale__c: req.body.emailEntreprise,
@@ -319,7 +321,7 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
       Salutation: req.body.civility,
       Phone: req.body.contactMobile,
       Fax: req.body.faxPro,
-      Fix__c: req.body.fix,
+      OtherPhone: req.body.otherPhone,
       PreferredLanguage__c: req.body.language, 
       Timezone__c: req.body.timezone
     };
@@ -509,35 +511,44 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
               console.warn('Skipping invalid file entry');
               continue;
             }
+
+            // Fix encoding issue: if the filename was sent as UTF-8 but interpreted as Latin-1 (e.g. "é" -> "Ã©")
+            let originalName = file.originalname;
+            try {
+              // This is a common fix for multer/busboy filename encoding issues
+              const decodedName = Buffer.from(originalName, 'binary').toString('utf8');
+              if (decodedName !== originalName) {
+                originalName = decodedName;
+              }
+            } catch (e) {
+              // fallback to original if decoding fails
+            }
+
             if (file.size > MAX_UPLOAD_BYTES) {
-              console.warn('File too large (server-side):', file.originalname);
+              console.warn('File too large (server-side):', originalName);
               return res.status(400).json({ success: false, error: 'Un des fichiers dépasse la taille maximale autorisée.' });
             }
-            const ext = path.extname(file.originalname || '').toLowerCase();
+            const ext = path.extname(originalName).toLowerCase();
             const mime = (file.mimetype || '').toLowerCase();
             const extAllowed = ALLOWED_EXTENSIONS.includes(ext);
             const mimeOk = ALLOWED_MIME_PREFIXES.some(p => mime.startsWith(p));
             if (!extAllowed && !mimeOk) {
-              console.warn('Disallowed file type (server-side):', file.originalname, mime);
+              console.warn('Disallowed file type (server-side):', originalName, mime);
               return res.status(400).json({ success: false, error: 'Type de fichier non autorisé.' });
             }
             if (/\.(exe|sh|bat|cmd|js|jar|msi)$/i.test(ext)) {
-              console.warn('Executable file rejected (server-side):', file.originalname);
+              console.warn('Executable file rejected (server-side):', originalName);
               return res.status(400).json({ success: false, error: 'Type de fichier dangereux non autorisé.' });
             }
 
             const base64 = file.buffer.toString('base64');
-            // Original filename and base name (without extension)
-            const originalName = file.originalname || 'file';
             const baseName = path.basename(originalName, ext) || 'FILE';
-            // Derive a type label from baseName (part before any parenthesis), uppercase
-            const typeLabelRaw = String(baseName).split('(')[0] || baseName;
-            const titleType = typeLabelRaw.replace(/[^a-zA-Z0-9 _-]/g, '_').toUpperCase();
-            // Company display name: use raisonSociale provided in the form (preserve case and spaces)
-            const companyRaw = (req.body && (req.body.raisonSociale || req.body.raison || '')).trim();
-            const companyDisplay = companyRaw ? String(companyRaw).replace(/[()]/g, '').replace(/\s+/g, ' ').slice(0, 60) : '';
-            // Build Title as TYPE(COMPANY) e.g. STATUT(Marjane 5) — if no company, just TYPE
-            const title = companyDisplay ? `${titleType}(${companyDisplay})` : titleType;
+            
+            // Use the baseName as the title directly, trimming whitespace.
+            // The frontend sends the correct filename (e.g. "Attestation d'assurance (AT).pdf").
+            // We do NOT strip parentheses or accents anymore, as requested.
+            const title = baseName.trim();
+            
             // Include extension in PathOnClient so Salesforce has the filename with extension
             const pathOnClient = `${title}${ext}`;
             console.log('Uploading file to ContentVersion - Title:', title, 'PathOnClient:', pathOnClient, 'MIME:', file.mimetype);
