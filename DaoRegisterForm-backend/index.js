@@ -265,7 +265,6 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
       
       // Company Information
       Phone: req.body.phone,
-      Fax_Pro__c: req.body.fax,
       Website: req.body.website,
       
       // Address
@@ -291,11 +290,11 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
       Effectif_Encadrement__c: req.body.effectifEncadrement,
       ExercicesClos__c: req.body.exercicesClos,
       // Certifications may come as an array (JSON) or as a joined string depending on client
-      Certifications__c: (function(c) {
+      Certifications_generales__c: (function(c) {
         if (!c) return '';
-        if (Array.isArray(c)) return c.join(';');
+        if (Array.isArray(c)) return c.join(', ');
         if (typeof c === 'string') {
-          try { const parsed = JSON.parse(c); if (Array.isArray(parsed)) return parsed.join(';') } catch (e) {}
+          try { const parsed = JSON.parse(c); if (Array.isArray(parsed)) return parsed.join(', ') } catch (e) {}
           return c;
         }
         return '';
@@ -320,7 +319,6 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
       Email: req.body.email,
       Salutation: req.body.civility,
       Phone: req.body.contactMobile,
-      Fax: req.body.faxPro,
       OtherPhone: req.body.otherPhone,
       PreferredLanguage__c: req.body.language, 
       Timezone__c: req.body.timezone
@@ -626,8 +624,23 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
       if (/duplicate value/i.test(msg)) {
         return 'Doublon détecté : un enregistrement avec cette valeur existe déjà. Veuillez vérifier le nom du fournisseur et réessayer.';
       }
+      
+      // Handle common Salesforce validation errors
+      if (/REQUIRED_FIELD_MISSING/i.test(msg)) {
+        return 'Des champs obligatoires sont manquants : ' + msg.replace(/.*REQUIRED_FIELD_MISSING: /i, '').replace(/[:\[\]]/g, ' ').trim();
+      }
+      if (/INVALID_EMAIL_ADDRESS/i.test(msg)) {
+        return 'Adresse email invalide : ' + msg.replace(/.*INVALID_EMAIL_ADDRESS: /i, '').trim();
+      }
+      if (/FIELD_CUSTOM_VALIDATION_EXCEPTION/i.test(msg)) {
+        return 'Erreur de validation : ' + msg.replace(/.*FIELD_CUSTOM_VALIDATION_EXCEPTION: /i, '').trim();
+      }
+      if (/INVALID_OR_NULL_FOR_RESTRICTED_PICKLIST/i.test(msg)) {
+        return 'Valeur invalide pour un champ de liste : ' + msg.replace(/.*INVALID_OR_NULL_FOR_RESTRICTED_PICKLIST: /i, '').trim();
+      }
+
       // Remove Salesforce record Ids (15 or 18 character alphanumeric)
-      msg = msg.replace(/\b[0-9A-Za-z]{15,18}\b/g, '[id supprimé]');
+      msg = msg.replace(/\b[0-9A-Za-z]{15,18}\b/g, '');
       // Replace API field names like SomeField__c or SomeField__r with a human-friendly label (remove __c/__r and underscores)
       msg = msg.replace(/\b([A-Za-z0-9_]+)__(?:c|r)\b/g, (m, p1) => {
         const human = p1.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
@@ -639,19 +652,36 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
     };
 
     let detailed = (error && error.message) ? String(error.message) : 'Erreur lors de la création du fournisseur';
+    let statusCode = 500;
+
     try {
       if (error && error.body) {
         // jsforce may put details in error.body (object or array)
-        if (typeof error.body === 'string') detailed = error.body;
-        else detailed = JSON.stringify(error.body);
+        if (Array.isArray(error.body) && error.body.length > 0) {
+             // Join multiple errors
+             detailed = error.body.map(e => e.message).join('; ');
+             // If any error is a validation error, set status to 400
+             if (error.body.some(e => ['REQUIRED_FIELD_MISSING', 'FIELD_CUSTOM_VALIDATION_EXCEPTION', 'INVALID_EMAIL_ADDRESS', 'INVALID_OR_NULL_FOR_RESTRICTED_PICKLIST'].includes(e.errorCode))) {
+                 statusCode = 400;
+             }
+        } else if (typeof error.body === 'string') {
+            detailed = error.body;
+        } else {
+            detailed = JSON.stringify(error.body);
+        }
       }
     } catch (e) {
       // ignore JSON errors
     }
 
+    // Heuristic to detect validation errors in the message string if not caught by body inspection
+    if (statusCode === 500 && /REQUIRED_FIELD_MISSING|FIELD_CUSTOM_VALIDATION_EXCEPTION|INVALID_EMAIL_ADDRESS|INVALID_OR_NULL_FOR_RESTRICTED_PICKLIST|STRING_TOO_LONG/i.test(detailed)) {
+        statusCode = 400;
+    }
+
     const safe = sanitizeMessage(detailed);
 
-    res.status(500).json({
+    res.status(statusCode).json({
       success: false,
       error: safe
     });

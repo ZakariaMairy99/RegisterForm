@@ -83,7 +83,6 @@ export const Step4Recap: React.FC<StepProps> = ({ data, onConfirm, isSubmitting,
             {renderRecapItem("Code Postal", data.postalCode, 'postalCode')}
             {renderRecapItem("Ville", data.city, 'city')}
             {renderRecapItem("Téléphone", data.phone, 'phone')}
-            {renderRecapItem("Fax pro", data.fax, 'fax')}
             {renderRecapItem("Site web", data.website, 'website')}
             {renderRecapItem("Email entreprise", data.emailEntreprise, 'emailEntreprise')}
           </div>
@@ -114,7 +113,14 @@ export const Step4Recap: React.FC<StepProps> = ({ data, onConfirm, isSubmitting,
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
             {renderRecapItem("Date création", data.dateCreation, 'dateCreation')}
             {renderRecapItem("Type", data.typeEntreprise, 'typeEntreprise')}
-            {renderRecapItem("Certifications", data.certifications.join(', ') || 'Aucune', 'certifications')}
+            {renderRecapItem("Certifications", (function() {
+              let list = [...(data.certifications || [])];
+              if (data.certificationsAutre && data.certificationsAutre.trim() !== '') {
+                const extra = data.certificationsAutre.trim();
+                if (!list.includes(extra)) list.push(extra);
+              }
+              return list.join(', ') || 'Aucune';
+            })(), 'certifications')}
             {renderRecapItem("Politique HSE", data.hsePolicy, 'hsePolicy')}
             {renderRecapItem("Fichiers joints", `${data.filesAttestationRC.length + data.filesAttestationRIB.length + data.filesAttestationTVA.length + data.filesICE.length + data.filesIdentifiantFiscal.length + data.filesPresentationCommerciale.length + data.filesStatutMaroc.length + data.filesAttestationAT.length + data.filesAttestationRC_Etranger.length + data.filesAttestationRIB_Etranger.length + data.filesICE_Etranger.length} fichiers`, 'filesAttestationRC')}
           </div>

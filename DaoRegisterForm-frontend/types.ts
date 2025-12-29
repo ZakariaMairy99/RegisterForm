@@ -14,7 +14,6 @@ export interface SupplierFormData {
   postalCode: string;
   city: string;
   phone: string;
-  fax: string;
   website: string;
   emailEntreprise: string;
 
@@ -23,7 +22,6 @@ export interface SupplierFormData {
   contactNom: string;
   contactPrenom: string;
   contactMobile: string;
-  faxPro: string;
   otherPhone: string;
   email: string;
   language: string;
@@ -36,6 +34,7 @@ export interface SupplierFormData {
   effectifEncadrement: string;
   exercicesClos: string;
   certifications: string[];
+  certificationsAutre: string;
   hsePolicy: string;
   
   // Files - Maroc
@@ -76,14 +75,12 @@ export const INITIAL_DATA: SupplierFormData = {
   postalCode: '',
   city: '',
   phone: '',
-  fax: '',
   website: '',
   emailEntreprise: '',
   civility: '',
   contactNom: '',
   contactPrenom: '',
   contactMobile: '',
-  faxPro: '',
   otherPhone: '',
   email: '',
   language: 'fr',
@@ -94,6 +91,7 @@ export const INITIAL_DATA: SupplierFormData = {
   effectifEncadrement: '',
   exercicesClos: '',
   certifications: [],
+  certificationsAutre: '',
   hsePolicy: 'oui',
   filesAttestationRC: [],
   filesAttestationRIB: [],
@@ -113,7 +111,7 @@ export const INITIAL_DATA: SupplierFormData = {
 
 export const STEPS = [
   { title: "Données d'organisation principale", label: "ÉTAPE 01" },
-  { title: "Contact principal entreprise", label: "ÉTAPE 02" },
+  { title: "Contact principal de l’entreprise", label: "ÉTAPE 02" },
   { title: "Documents", label: "ÉTAPE 03" },
   { title: "Récapitulatif", label: "ÉTAPE 04" },
   { title: "Confirmation", label: "ÉTAPE 05" },

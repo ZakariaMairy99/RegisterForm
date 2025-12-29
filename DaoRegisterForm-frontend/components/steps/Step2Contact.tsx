@@ -13,7 +13,7 @@ export const Step2Contact: React.FC<StepProps> = ({ data, update, errors }) => {
   return (
     <div className="animate-fade-in bg-app-surface p-6 md:p-8 rounded-2xl shadow-sm border border-app-border">
       <div className="mb-5">
-        <h2 className="text-lg font-bold text-text-main">Contact principal entreprise</h2>
+        <h2 className="text-lg font-bold text-text-main">Contact principal de l’entreprise</h2>
         <p className="text-xs text-text-muted mt-0.5">Personne à contacter pour la gestion du compte.</p>
       </div>
 
@@ -48,12 +48,6 @@ export const Step2Contact: React.FC<StepProps> = ({ data, update, errors }) => {
           type="tel"
           value={data.contactMobile}
           onChange={e => update('contactMobile', e.target.value)}
-        />
-        <Input 
-          label="Fax Pro" 
-          type="tel"
-          value={data.faxPro}
-          onChange={e => update('faxPro', e.target.value)}
         />
         <Input 
           label="Téléphone professionnel" 

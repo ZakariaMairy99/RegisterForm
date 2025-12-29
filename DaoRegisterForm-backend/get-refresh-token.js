@@ -1,26 +1,20 @@
 require('dotenv').config();
 const express = require('express');
-const https = require('https');
+const http = require('http'); // Use HTTP instead of HTTPS to avoid certificate issues
 const fs = require('fs');
 const path = require('path');
 const jsforce = require('jsforce');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
-const HOST = process.env.HOST || '0.0.0.0';
-
-// SSL Certificate
-const httpsOptions = {
-  key: fs.readFileSync(path.join(__dirname, 'certs', 'localhost.key')),
-  cert: fs.readFileSync(path.join(__dirname, 'certs', 'localhost.crt'))
-};
+const PORT = 3010;
+const HOST = 'localhost';
 
 // OAuth2 configuration
 const oauth2 = new jsforce.OAuth2({
   loginUrl: process.env.SALESFORCE_LOGIN_URL || 'https://login.salesforce.com',
   clientId: process.env.SALESFORCE_CLIENT_ID,
   clientSecret: process.env.SALESFORCE_CLIENT_SECRET,
-  redirectUri: `https://${HOST}:${PORT}/oauth/callback`
+  redirectUri: `http://localhost:${PORT}/oauth/callback` // HTTP callback
 });
 
 console.log('\n🔐 Salesforce OAuth Setup Tool\n');
@@ -88,12 +82,12 @@ SALESFORCE_REFRESH_TOKEN=${conn.refreshToken}</pre>
   }
 });
 
-// Start HTTPS server
-https.createServer(httpsOptions, app).listen(PORT, HOST, () => {
-  console.log(`✅ OAuth HTTPS server started on https://${HOST}:${PORT}\n`);
+// Start HTTP server
+http.createServer(app).listen(PORT, HOST, () => {
+  console.log(`✅ OAuth HTTP server started on http://${HOST}:${PORT}\n`);
   console.log('📋 Steps to get your refresh token:\n');
   console.log(`1. Make sure SALESFORCE_CLIENT_ID and SALESFORCE_CLIENT_SECRET are set in .env`);
-  console.log(`2. Open your browser and go to: https://${HOST}:${PORT}/auth`);
+  console.log(`2. Open your browser and go to: http://${HOST}:${PORT}/auth`);
   console.log(`3. Login to Salesforce and approve the app`);
   console.log(`4. Copy the SALESFORCE_REFRESH_TOKEN to your .env file`);
   console.log(`5. Stop this server (Ctrl+C) and start your main app\n`);

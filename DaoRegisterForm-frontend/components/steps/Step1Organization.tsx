@@ -168,12 +168,6 @@ export const Step1Organization: React.FC<StepProps> = ({ data, update, errors })
           error={errors?.phone}
         />
         <Input 
-          label="Fax pro" 
-          type="tel"
-          value={data.fax}
-          onChange={e => update('fax', e.target.value)}
-        />
-        <Input 
           label="Site web" 
           type="url"
           helperText="si vous disposez d'un site web professionnel"

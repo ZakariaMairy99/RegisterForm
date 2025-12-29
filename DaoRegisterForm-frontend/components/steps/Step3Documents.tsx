@@ -33,7 +33,7 @@ export const Step3Documents: React.FC<StepProps> = ({ data, update, errors }) =>
           />
 
           <Select 
-            label="2. Type entreprise" 
+            label="2. Type d’entreprise" 
             options={[{value: 'Manufacture', label: 'Manufacture'}, {value: 'Service', label: 'Service'}]}
             value={data.typeEntreprise}
             onChange={e => update('typeEntreprise', e.target.value)}
@@ -148,7 +148,7 @@ export const Step3Documents: React.FC<StepProps> = ({ data, update, errors }) =>
 
           <Input 
             type="number"
-            label="11. Effectif encadrement"
+            label="11. Effectif d’encadrement"
             value={data.effectifEncadrement}
             onChange={e => update('effectifEncadrement', e.target.value)}
           />
@@ -175,11 +175,28 @@ export const Step3Documents: React.FC<StepProps> = ({ data, update, errors }) =>
             'ISO 50001',
             'IATF 16949',
             'ISO 20000-1',
-            'ISO 26000',
-            'SA 8000'
+            'ISO 26000'
           ]}
           selected={data.certifications}
           onChange={selected => update('certifications', selected)}
+        />
+
+        <Input
+          label="Précisez des autres certifications"
+          placeholder="Saisissez une certification et appuyez sur Entrée"
+          value={data.certificationsAutre}
+          onChange={e => update('certificationsAutre', e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              const val = data.certificationsAutre.trim();
+              if (val && !data.certifications.includes(val)) {
+                update('certifications', [...data.certifications, val]);
+                update('certificationsAutre', '');
+              }
+            }
+          }}
+          maxLength={255}
         />
 
         <div className="flex flex-col gap-3 p-5 bg-gray-50 rounded-xl border border-gray-200">

@@ -328,6 +328,17 @@ export const useSupplierForm = () => {
           ? (formData.formeJuridiqueAutre && formData.formeJuridiqueAutre.trim() !== '' ? formData.formeJuridiqueAutre : 'AUTRE')
           : formData.formeJuridique;
 
+        // Prepare certifications string: join all selected and manually added values with comma
+        let certificationsList = [...(formData.certifications || [])];
+        // Also include any text remaining in the "Autre" field that wasn't "entered" into the list
+        if (formData.certificationsAutre && formData.certificationsAutre.trim() !== '') {
+          const extra = formData.certificationsAutre.trim();
+          if (!certificationsList.includes(extra)) {
+            certificationsList.push(extra);
+          }
+        }
+        const certificationsString = certificationsList.join(', ');
+
         // Validate entire form before sending
         const allErrs = validateAll();
         if (Object.keys(allErrs).length > 0) {
@@ -349,7 +360,6 @@ export const useSupplierForm = () => {
           city: formData.city,
           country: formData.country,
           phone: formData.phone,
-          fax: formData.fax,
           website: formData.website,
           emailEntreprise: formData.emailEntreprise,
 
@@ -359,7 +369,7 @@ export const useSupplierForm = () => {
           effectifTotal: formData.effectifTotal,
           effectifEncadrement: formData.effectifEncadrement,
           exercicesClos: formData.exercicesClos,
-          certifications: formData.certifications,
+          certifications: certificationsString,
           hsePolicy: formData.hsePolicy,
 
           // Contact data
@@ -368,7 +378,6 @@ export const useSupplierForm = () => {
           contactPrenom: formData.contactPrenom,
           email: formData.email,
           contactMobile: formData.contactMobile,
-          faxPro: formData.faxPro,
           otherPhone: formData.otherPhone,
           language: formData.language,
           timezone: formData.timezone,
@@ -454,7 +463,6 @@ export const useSupplierForm = () => {
             city: formData.city,
             country: formData.country,
             phone: formData.phone,
-            fax: formData.fax,
             website: formData.website,
             emailEntreprise: formData.emailEntreprise,
             dateCreation: formData.dateCreation,
@@ -462,14 +470,13 @@ export const useSupplierForm = () => {
             effectifTotal: formData.effectifTotal,
             effectifEncadrement: formData.effectifEncadrement,
             exercicesClos: formData.exercicesClos,
-            certifications: (formData.certifications || []).join(';'),
+            certifications: certificationsString,
             hsePolicy: formData.hsePolicy,
             civility: formData.civility,
             contactNom: formData.contactNom,
             contactPrenom: formData.contactPrenom,
             email: formData.email,
             contactMobile: formData.contactMobile,
-            faxPro: formData.faxPro,
             otherPhone: formData.otherPhone,
             language: formData.language,
             timezone: formData.timezone
@@ -611,10 +618,12 @@ export const useSupplierForm = () => {
               // Show error message via state instead of blocking alert
               const errMsg = result && result.error ? result.error : 'Failed to create supplier';
               const safeRaw = sanitizeClientMessage(errMsg);
-              // Only show actionable messages to users: duplicates or validation-related messages.
+              // Only show actionable messages to users: duplicates, validation-related messages, or 400 Bad Request errors.
               const isDuplicate = /doublon|duplicate|valeur dupli/i.test(String(safeRaw).toLowerCase());
               const isValidation = Object.keys(validationErrors || {}).length > 0;
-              if (isDuplicate || isValidation) {
+              const isUserError = resp.status === 400;
+
+              if (isDuplicate || isValidation || isUserError) {
                 console.warn('Submission error (actionable):', safeRaw);
                 setSubmitError(safeRaw);
               } else {
