@@ -1,7 +1,8 @@
-
+﻿
 import React from 'react';
 import { Input, Select } from '../FormComponents';
 import { SupplierFormData } from '../../types';
+import { COUNTRIES } from '../countries';
 
 interface StepProps {
   data: SupplierFormData;
@@ -11,18 +12,19 @@ interface StepProps {
 
 export const Step1Organization: React.FC<StepProps> = ({ data, update, errors }) => {
   // Conditional field visibility based on country
-  const showIce = data.country === 'MAROC';
-  const showTvaAndSiret = data.country === 'ETRANGER';
+  const isMaroc = data.country === 'MA';
+  const isFrance = data.country === 'France';
+  const isOther = !isMaroc && !isFrance && !!data.country;
   
   return (
-    <div className="animate-fade-in bg-app-surface p-6 md:p-8 rounded-2xl shadow-sm border border-app-border">
-      <div className="mb-5">
-        <h2 className="text-lg font-bold text-text-main">Données entreprise</h2>
-        <p className="text-xs text-text-muted mt-0.5">Informations générales et légales de la structure.</p>
+    <div className="bg-white p-6 md:p-10 rounded-2xl shadow-lg shadow-gray-100/50 border border-gray-100 animate-fade-in-up">
+      <div className="mb-8 pb-4 border-b border-gray-50">
+        <h2 className="text-2xl font-bold text-gray-900">Données entreprise</h2>
+        <p className="text-sm text-gray-500 mt-1">Informations générales et légales de la structure.</p>
       </div>
       
       {/* Main Company Information Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4 mb-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6 mb-8">
         <Input 
           label="Raison sociale" 
           required
@@ -72,15 +74,38 @@ export const Step1Organization: React.FC<StepProps> = ({ data, update, errors })
       </div>
 
       {/* Country Section */}
-      <div className="bg-app-surface border border-app-border rounded-lg p-4 mb-5">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4">
+      <div className="bg-gray-50 border border-gray-100 rounded-xl p-5 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
           <Select 
             label="Pays" 
-            options={[{value: 'MAROC', label: 'MAROC'}, {value: 'ETRANGER', label: 'Étranger'}]}
+            options={COUNTRIES}
             value={data.country}
-            onChange={e => update('country', e.target.value)}
+            onChange={e => {
+              const newCountry = e.target.value;
+              update('country', newCountry);
+              
+              // Clear fields based on selection
+              if (newCountry === 'MA') {
+                update('siret', '');
+                update('tva', '');
+                update('identifiantFiscal1', '');
+                update('identifiantFiscal2', '');
+              } else if (newCountry === 'France') {
+                update('ice', '');
+                update('rc', '');
+                update('identifiantFiscal', '');
+                update('identifiantFiscal1', '');
+                update('identifiantFiscal2', '');
+              } else {
+                update('ice', '');
+                update('rc', '');
+                update('identifiantFiscal', '');
+                update('siret', '');
+                update('tva', '');
+              }
+            }}
           />
-          {showIce && (
+          {isMaroc && (
             <>
             <Input 
               label="ICE" 
@@ -101,9 +126,6 @@ export const Step1Organization: React.FC<StepProps> = ({ data, update, errors })
               onChange={e => update('rc', e.target.value)}
               maxLength={255}
             />
-            </>
-          )}
-          {showIce && (
             <Input
               label="Identifiant fiscal"
               value={data.identifiantFiscal}
@@ -111,8 +133,11 @@ export const Step1Organization: React.FC<StepProps> = ({ data, update, errors })
               maxLength={255}
               error={errors?.identifiantFiscal}
             />
+            </>
           )}
-          {showTvaAndSiret && (
+          
+          {isFrance && (
+            <>
             <Input 
               label="SIRET" 
               value={data.siret}
@@ -123,19 +148,35 @@ export const Step1Organization: React.FC<StepProps> = ({ data, update, errors })
               }}
               maxLength={14}
             />
-          )}
-          {showTvaAndSiret && (
             <Input 
               label="TVA intracommunautaire" 
               value={data.tva}
               onChange={e => update('tva', e.target.value)}
             />
+            </>
+          )}
+
+          {isOther && (
+            <>
+            <Input 
+              label="Identifiant fiscal 1" 
+              value={data.identifiantFiscal1}
+              onChange={e => update('identifiantFiscal1', e.target.value)}
+              maxLength={255}
+            />
+            <Input 
+              label="Identifiant fiscal 2" 
+              value={data.identifiantFiscal2}
+              onChange={e => update('identifiantFiscal2', e.target.value)}
+              maxLength={255}
+            />
+            </>
           )}
         </div>
       </div>
 
       {/* Address Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
         <Input 
           label="Adresse" 
           required

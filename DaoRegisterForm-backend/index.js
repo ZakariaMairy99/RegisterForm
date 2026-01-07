@@ -6,6 +6,8 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const jsforce = require('jsforce');
+const mindee = require('mindee');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 require('dotenv').config();
 
 const app = express();
@@ -242,19 +244,15 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
     // If multipart was used, multer populated req.body (strings) and req.files (buffers)
     console.log('Creating supplier in Salesforce:', req.body);
 
-    // Normalize country value to Salesforce picklist API names (MA or Etranger)
-    // Picklist API names: MA (Maroc), Etranger (without accent)
+    // Normalize country value to Salesforce picklist API names
     let countryApiValue;
     if (req.body && req.body.country) {
-      const c = String(req.body.country).trim().toLowerCase();
-      if (/^ma(ro)?c?$/.test(c) || /^maroc$/.test(c)) {
-        countryApiValue = 'MA';
-      } else if (/^étrang(er)?$/.test(c) || /^etranger$/.test(c)) {
-        // Use 'Etranger' without accent as per Salesforce picklist configuration
-        countryApiValue = 'Etranger';
-      } else {
-        countryApiValue = c; // fallback: send raw value
-      }
+      let c = String(req.body.country).trim();
+      // Remove invisible characters but keep accents
+      // This regex keeps standard ASCII, Latin-1 Supplement, and Latin Extended-A
+      c = c.replace(/[^\x20-\x7E\u00A0-\u00FF\u0100-\u017F]/g, '');
+      
+      countryApiValue = c;
       console.log(`🌍 Country normalization: "${req.body.country}" -> "${countryApiValue}"`);
     }
 
@@ -281,12 +279,16 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
       LegalForm__c: req.body.formeJuridique,
       CommonCompanyIdentifier__c: req.body.ice,
       FiscalIdentifier__c: req.body.identifiantFiscal,
+      Identifiant_fiscal_1__c: req.body.identifiantFiscal1,
+      Identifiant_fiscal_2__c: req.body.identifiantFiscal2,
       Siret__c: req.body.siret,
-      VATNumberMaroc__c: req.body.tva,
+      // Use VATNumber__c for TVA Intracommunautaire (France/Other) and VATNumberMaroc__c for Maroc if needed
+      // Assuming req.body.tva holds the value for both cases from frontend
+      VATNumber__c: req.body.tva,
       EmailPrincipale__c: req.body.emailEntreprise,
       DateCreation__c: req.body.dateCreation,
       SupplierType__c: req.body.typeEntreprise,
-      NumberOfEmployees: req.body.effectifTotal,
+      Nombre_d_employes__c: req.body.effectifTotal,
       Effectif_Encadrement__c: req.body.effectifEncadrement,
       ExercicesClos__c: req.body.exercicesClos,
       // Certifications may come as an array (JSON) or as a joined string depending on client
@@ -357,24 +359,24 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
       }
     });
 
-    // Query for Account RecordType "Fournisseur à qualifier" (Supplier to qualify)
+    // Determine Record Type based on Country
+    // Maroc -> LocalSupplier
+    // Other -> ForeignSupplier
+    // Frontend sends 'MA' for Maroc, so we check for both 'maroc' and 'ma'
+    const isLocal = countryApiValue && (countryApiValue.toLowerCase() === 'maroc' || countryApiValue.toLowerCase() === 'ma');
+    const targetRtDevName = isLocal ? 'LocalSupplier' : 'ForeignSupplier';
+    console.log(`🌍 Country is "${countryApiValue}", selecting RecordType: ${targetRtDevName}`);
+
     let recordTypeId = null;
     try {
       const rtQuery = await conn.query(
-        "SELECT Id FROM RecordType WHERE SObjectType='Account' AND DeveloperName='Fournisseur_a_qualifier' LIMIT 1"
+        `SELECT Id FROM RecordType WHERE SObjectType='Account' AND DeveloperName='${targetRtDevName}' LIMIT 1`
       );
       if (rtQuery && rtQuery.records && rtQuery.records.length > 0) {
         recordTypeId = rtQuery.records[0].Id;
-        console.log('✅ Found RecordType "Fournisseur à qualifier":', recordTypeId);
+        console.log(`✅ Found RecordType "${targetRtDevName}":`, recordTypeId);
       } else {
-        console.warn('⚠️ RecordType "Fournisseur_a_qualifier" not found. Trying by Name...');
-        const rtQuery2 = await conn.query(
-          "SELECT Id FROM RecordType WHERE SObjectType='Account' AND Name='Fournisseur à qualifier' LIMIT 1"
-        );
-        if (rtQuery2 && rtQuery2.records && rtQuery2.records.length > 0) {
-          recordTypeId = rtQuery2.records[0].Id;
-          console.log('✅ Found RecordType by Name:', recordTypeId);
-        }
+        console.warn(`⚠️ RecordType "${targetRtDevName}" not found.`);
       }
     } catch (rtErr) {
       console.warn('⚠️ Could not query RecordType:', rtErr && rtErr.message);
@@ -492,6 +494,78 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
       }
     }
 
+    // Create AttestationDeregularite__c record if OCR data was provided
+    let attestationResult = { id: null, success: false };
+    if (req.body.attestationRegulariteFiscaleData) {
+      try {
+        let ocrData = req.body.attestationRegulariteFiscaleData;
+        // Parse if it's a JSON string
+        if (typeof ocrData === 'string') {
+          ocrData = JSON.parse(ocrData);
+        }
+        
+        console.log('📄 Creating AttestationDeregularite__c with OCR data:', ocrData);
+        
+        // Helper function to convert date from DD-MM-YYYY to YYYY-MM-DD format
+        const convertDateFormat = (dateStr) => {
+          if (!dateStr) return null;
+          // If already in YYYY-MM-DD format, return as is
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            return dateStr;
+          }
+          // Convert from DD-MM-YYYY to YYYY-MM-DD
+          const match = dateStr.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+          if (match) {
+            return `${match[3]}-${match[2]}-${match[1]}`;
+          }
+          // Return null if format is not recognized
+          console.warn('⚠️ Unrecognized date format:', dateStr);
+          return null;
+        };
+        
+        // Map Mindee fields to Salesforce fields
+        const attestationData = {
+          Fournisseur__c: accountResult.id, // Link to the Account
+          NumeroAttestation__c: ocrData.numero_attestation || null,
+          NumeroDidentificationFiscale__c: ocrData.numero_d_identification_fiscale || null,
+          IdentifiantCommunEntreprise__c: ocrData.ice || null,
+          NumeroRegistreCommerce__c: ocrData.registre_de_commerce || null,
+          NumeroDidentificationTaxePro__c: ocrData.taxe_professionnelle ? String(ocrData.taxe_professionnelle) : null,
+          DateDebut__c: convertDateFormat(ocrData.date_reception),
+          DateEdition__c: convertDateFormat(ocrData.date_edition),
+          EstEnRegularite__c: ocrData.statut_regularite === true || ocrData.statut_regularite === 'true',
+          AConstiteDesGarantiesSuffisante__c: ocrData.statut_garanties === true || ocrData.statut_garanties === 'true',
+          NestPasEnRegle__c: ocrData.nest_pas_en_regle === true || ocrData.nest_pas_en_regle === 'true'
+        };
+        
+        // Remove null/undefined fields
+        Object.keys(attestationData).forEach(key => {
+          if (attestationData[key] === undefined || attestationData[key] === null || attestationData[key] === '') {
+            delete attestationData[key];
+          }
+        });
+        
+        // Keep the Fournisseur__c field even if cleaning
+        attestationData.Fournisseur__c = accountResult.id;
+        
+        console.log('📤 AttestationDeregularite__c data to create:', JSON.stringify(attestationData, null, 2));
+        
+        attestationResult = await conn.sobject('AttestationDeregularite__c').create(attestationData);
+        
+        if (attestationResult.success) {
+          console.log('✅ AttestationDeregularite__c created:', attestationResult.id);
+        } else {
+          console.error('❌ AttestationDeregularite__c creation failed:', attestationResult.errors);
+        }
+      } catch (attErr) {
+        console.error('❌ Error creating AttestationDeregularite__c:', attErr && attErr.message ? attErr.message : attErr);
+        if (attErr && attErr.body) {
+          console.error('Attestation error body:', JSON.stringify(attErr.body, null, 2));
+        }
+        // Don't fail the whole request, just log the error
+      }
+    }
+
     // If there are files uploaded via multipart, validate and attach them to the Account via ContentVersion + ContentDocumentLink
     try {
       const files = req.files || [];
@@ -547,6 +621,24 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
             // We do NOT strip parentheses or accents anymore, as requested.
             const title = baseName.trim();
             
+            // Determine the restart location (ParentId)
+            // Default to Account
+            let firstPublishLocationId = accountResult.id;
+            let secondaryLinkEntityId = null;
+
+            // Check if this is the Attestation file and if we have an Attestation record
+            const isAttestationFile = title && (
+              title.includes('Attestation de Régularité Fiscale') || 
+              title.includes('Attestation de Regularite Fiscale') ||
+              (title.includes('Attestation') && title.includes('Fiscale') && title.includes('R'))
+            );
+
+            if (isAttestationFile && attestationResult && attestationResult.id) {
+               console.log('🎯 Detected Attestation file. Setting FirstPublishLocationId to Attestation record:', attestationResult.id);
+               firstPublishLocationId = attestationResult.id;
+               secondaryLinkEntityId = accountResult.id;
+            }
+
             // Include extension in PathOnClient so Salesforce has the filename with extension
             const pathOnClient = `${title}${ext}`;
             console.log('Uploading file to ContentVersion - Title:', title, 'PathOnClient:', pathOnClient, 'MIME:', file.mimetype);
@@ -555,26 +647,47 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
               Title: title,
               PathOnClient: pathOnClient,
               VersionData: base64,
-              FirstPublishLocationId: accountResult.id
+              FirstPublishLocationId: firstPublishLocationId
             };
 
             const cvRes = await conn.sobject('ContentVersion').create(cv);
             console.log('📤 ContentVersion created id=', cvRes.id, 'for file:', pathOnClient);
+            
             // Query to get ContentDocumentId
             const q = await conn.query(`SELECT ContentDocumentId FROM ContentVersion WHERE Id='${cvRes.id}'`);
             const contentDocumentId = q.records && q.records[0] && q.records[0].ContentDocumentId;
+            
             if (contentDocumentId) {
-              try {
-                const linkResult = await conn.sobject('ContentDocumentLink').create({
-                  ContentDocumentId: contentDocumentId,
-                  LinkedEntityId: accountResult.id,
-                  ShareType: 'V',
-                  Visibility: 'AllUsers'
-                });
-                console.log('🔗 Linked ContentDocument to Account:', contentDocumentId, '-> Account:', accountResult.id);
-                uploadedFiles.push({ fileName: pathOnClient, contentDocumentId });
-              } catch (linkErr) {
-                console.warn('⚠️ ContentDocumentLink create warning:', linkErr && linkErr.message ? linkErr.message : linkErr);
+              // If we have a secondary entity to link to (e.g. we published to Attestation, now link to Account)
+              // OR if we published to Account (default) and just want to ensure it's linked there (implicit in FirstPublishLocationId but safer to check logic)
+              
+              // Only create explicit link if secondaryLinkEntityId is defined (meaning we published to Attestation)
+              // OR if we published to Account (default), we don't need to link to Account again.
+              
+              if (secondaryLinkEntityId) {
+                  try {
+                    await conn.sobject('ContentDocumentLink').create({
+                      ContentDocumentId: contentDocumentId,
+                      LinkedEntityId: secondaryLinkEntityId,
+                      ShareType: 'V',
+                      Visibility: 'AllUsers'
+                    });
+                    console.log('🔗 Linked ContentDocument to Secondary Entity (Account):', contentDocumentId, '->', secondaryLinkEntityId);
+                  } catch (linkErr) {
+                    console.warn('⚠️ Standard ContentDocumentLink create warning:', linkErr && linkErr.message ? linkErr.message : linkErr);
+                  }
+              } else {
+                 // We published to Account. If we were trying to link to Attestation in the old logic, we don't need that anymore 
+                 // because the new logic handles Attestation as PRIMARY if detected.
+                 
+                 // However, for NON-Attestation files, we just ensure the default link is created via FirstPublishLocationId.
+                 // Salesforce auto-creates a link to FirstPublishLocationId, so no manual link needed for that one.
+                 
+                 // Just strictly explicitly link to Account if for some reason FirstPublishLocationId didn't do it (rare but possible with library workspaces)
+                 // But typically FirstPublishLocationId is enough.
+                 
+                 // We keep the logic simple: We uploaded to firstPublishLocationId. Done.
+                 uploadedFiles.push({ fileName: pathOnClient, contentDocumentId });
               }
             } else {
               console.warn('⚠️ Could not determine ContentDocumentId for ContentVersion', cvRes.id);
@@ -602,6 +715,7 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
         accountId: accountResult.id,
         contactId: contactResult.id || null,
         contactLinked: !!contactResult.id,
+        attestationId: attestationResult.id || null,
         uploadedFiles: res.locals.uploadedFiles || []
       },
       warnings: []
@@ -610,6 +724,11 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
     // Add warnings if contact wasn't created/linked
     if (!contactResult.id) {
       responseData.warnings.push('Contact could not be created or linked. The account was created successfully, but you may need to manually create or link the contact in Salesforce.');
+    }
+    
+    // Add warning if attestation wasn't created
+    if (req.body.attestationRegulariteFiscaleData && !attestationResult.id) {
+      responseData.warnings.push('L\'attestation de régularité fiscale n\'a pas pu être créée. Les données OCR ont été reçues mais la création dans Salesforce a échoué.');
     }
 
     res.status(201).json(responseData);
@@ -685,6 +804,81 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
       success: false,
       error: safe
     });
+  }
+});
+
+// Gemini OCR Route
+app.post('/api/ocr/analyze', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error('GEMINI_API_KEY is missing');
+      return res.status(500).json({ error: 'Server configuration error: API Key missing' });
+    }
+
+    // Initialize Gemini
+    const genAI = new GoogleGenerativeAI(apiKey);
+    // Use a model that supports vision. 
+    // Use the model defined in .env or fallback to "gemini-1.5-flash"
+    const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+    console.log(`[OCR] Using Gemini Model: ${modelName}`);
+    const model = genAI.getGenerativeModel({ model: modelName });
+
+    // Prepare image data
+    const imagePart = {
+      inlineData: {
+        data: req.file.buffer.toString('base64'),
+        mimeType: req.file.mimetype
+      },
+    };
+
+    const prompt = `
+      Analyse ce document (Attestation de Régularité Fiscale Marocaine) et extrais les informations suivantes au format JSON uniquement.
+      Ne mets pas de markdown (pas de \`\`\`json). Renvoie juste l'objet JSON brut.
+
+      Champs à extraire :
+      - numero_attestation (String)
+      - numero_d_identification_fiscale (String)
+      - ice (String)
+      - registre_de_commerce (String)
+      - taxe_professionnelle (String)
+      - date_reception (String, format DD-MM-YYYY)
+      - date_edition (String, format DD-MM-YYYY)
+      - statut_regularite (Boolean, true si le contribuable est en situation fiscale régulière)
+      - statut_garanties (Boolean, true si le contribuable a constitué des garanties suffisantes)
+      - nest_pas_en_regle (Boolean, true si le contribuable n'est pas en règle)
+
+      Si un champ n'est pas trouvé, mets null.
+    `;
+
+    console.log('🤖 Sending request to Gemini...');
+    const result = await model.generateContent([prompt, imagePart]);
+    const response = await result.response;
+    let text = response.text();
+    
+    console.log('Gemini Raw Response:', text);
+
+    // Clean up markdown if present
+    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    let jsonResult = {};
+    try {
+      jsonResult = JSON.parse(text);
+    } catch (e) {
+      console.error('Failed to parse Gemini JSON:', e);
+      return res.status(500).json({ error: 'Erreur lors de l\'analyse du document (Format invalide)' });
+    }
+
+    console.log('Formatted result:', jsonResult);
+    res.json(jsonResult);
+
+  } catch (error) {
+    console.error('Gemini Error:', error);
+    res.status(500).json({ error: 'Erreur lors de l\'analyse OCR: ' + error.message });
   }
 });
 

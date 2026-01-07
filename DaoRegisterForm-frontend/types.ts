@@ -10,6 +10,8 @@ export interface SupplierFormData {
   siret: string;
   tva: string;
   identifiantFiscal: string;
+  identifiantFiscal1: string;
+  identifiantFiscal2: string;
   address: string;
   postalCode: string;
   city: string;
@@ -44,6 +46,7 @@ export interface SupplierFormData {
   filesICE: File[];
   filesIdentifiantFiscal: File[];
   filesPresentationCommerciale: File[];
+  filesAttestationRegulariteFiscale: File[];
   filesStatutMaroc: File[];
   
   // Files - Étranger
@@ -51,6 +54,20 @@ export interface SupplierFormData {
   filesAttestationRC_Etranger: File[];
   filesAttestationRIB_Etranger: File[];
   filesICE_Etranger: File[];
+  
+  // Données OCR de l'Attestation de Régularité Fiscale (scannées via Mindee)
+  attestationRegulariteFiscaleData?: {
+    numero_attestation?: string;
+    numero_d_identification_fiscale?: string;
+    ice?: string;
+    registre_de_commerce?: string;
+    taxe_professionnelle?: string | number;
+    date_reception?: string;
+    date_edition?: string;
+    statut_regularite?: boolean;
+    statut_garanties?: boolean;
+    nest_pas_en_regle?: boolean;
+  };
   
   // Optional logo URL retrieved from backend custom metadata
   logoUrl?: string;
@@ -71,6 +88,8 @@ export const INITIAL_DATA: SupplierFormData = {
   siret: '',
   tva: '',
   identifiantFiscal: '',
+  identifiantFiscal1: '',
+  identifiantFiscal2: '',
   address: '',
   postalCode: '',
   city: '',
@@ -99,11 +118,13 @@ export const INITIAL_DATA: SupplierFormData = {
   filesICE: [],
   filesIdentifiantFiscal: [],
   filesPresentationCommerciale: [],
+  filesAttestationRegulariteFiscale: [],
   filesStatutMaroc: [],
   filesAttestationAT: [],
   filesAttestationRC_Etranger: [],
   filesAttestationRIB_Etranger: [],
   filesICE_Etranger: [],
+  attestationRegulariteFiscaleData: undefined,
   logoUrl: '',
   logoName: '',
   logoDeveloper: '',

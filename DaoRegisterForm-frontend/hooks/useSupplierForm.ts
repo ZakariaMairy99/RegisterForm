@@ -36,6 +36,7 @@ const saveStateToStorage = (formData: SupplierFormData, currentStep: number) => 
     safeFormData.filesICE = [];
     safeFormData.filesIdentifiantFiscal = [];
     safeFormData.filesPresentationCommerciale = [];
+    safeFormData.filesAttestationRegulariteFiscale = [];
     safeFormData.filesStatutMaroc = [];
     safeFormData.filesAttestationAT = [];
     safeFormData.filesAttestationRC_Etranger = [];
@@ -287,6 +288,12 @@ export const useSupplierForm = () => {
     };
 
     const submitForm = async () => {
+      // Guard: only allow submission from the Recap step
+      if (currentStep !== STEPS.length - 2) {
+        console.warn('Submission blocked: attempt to submit from step ' + currentStep);
+        return;
+      }
+
       setIsSubmitting(true);
       // Clear previous feedback
       setSubmitError(null);
@@ -401,19 +408,28 @@ export const useSupplierForm = () => {
         };
 
         // Attach only country-relevant identifier fields
-        if (formData.country === 'MAROC') {
+        if (formData.country === 'MA') {
           payload.ice = normalizedIce;
           payload.rc = formData.rc;
           payload.identifiantFiscal = formData.identifiantFiscal;
-        } else if (formData.country === 'ETRANGER') {
+        } else if (formData.country === 'France') {
           payload.siret = normalizedSiret;
           payload.tva = formData.tva;
+        } else {
+          payload.identifiantFiscal1 = formData.identifiantFiscal1;
+          payload.identifiantFiscal2 = formData.identifiantFiscal2;
+        }
+
+        // Attach attestation OCR data if available
+        if (formData.attestationRegulariteFiscaleData) {
+          payload.attestationRegulariteFiscaleData = formData.attestationRegulariteFiscaleData;
+          console.log('📄 Données OCR attestation dans payload:', formData.attestationRegulariteFiscaleData);
         }
 
         
 
         // If there are files, validate them client-side then send as multipart/form-data; otherwise send JSON
-        const totalFiles = (formData.filesAttestationRC?.length || 0) + (formData.filesAttestationRIB?.length || 0) + (formData.filesAttestationTVA?.length || 0) + (formData.filesICE?.length || 0) + (formData.filesIdentifiantFiscal?.length || 0) + (formData.filesPresentationCommerciale?.length || 0) + (formData.filesStatutMaroc?.length || 0) + (formData.filesAttestationAT?.length || 0) + (formData.filesAttestationRC_Etranger?.length || 0) + (formData.filesAttestationRIB_Etranger?.length || 0) + (formData.filesICE_Etranger?.length || 0);
+        const totalFiles = (formData.filesAttestationRC?.length || 0) + (formData.filesAttestationRIB?.length || 0) + (formData.filesAttestationTVA?.length || 0) + (formData.filesICE?.length || 0) + (formData.filesIdentifiantFiscal?.length || 0) + (formData.filesPresentationCommerciale?.length || 0) + (formData.filesAttestationRegulariteFiscale?.length || 0) + (formData.filesStatutMaroc?.length || 0) + (formData.filesAttestationAT?.length || 0) + (formData.filesAttestationRC_Etranger?.length || 0) + (formData.filesAttestationRIB_Etranger?.length || 0) + (formData.filesICE_Etranger?.length || 0);
         // Pre-validate files across categories to avoid uploading disallowed files
         const categories = [
           ['filesAttestationRC', formData.filesAttestationRC],
@@ -422,6 +438,7 @@ export const useSupplierForm = () => {
           ['filesICE', formData.filesICE],
           ['filesIdentifiantFiscal', formData.filesIdentifiantFiscal],
           ['filesPresentationCommerciale', formData.filesPresentationCommerciale],
+          ['filesAttestationRegulariteFiscale', formData.filesAttestationRegulariteFiscale],
           ['filesStatutMaroc', formData.filesStatutMaroc],
           ['filesAttestationAT', formData.filesAttestationAT],
           ['filesAttestationRC_Etranger', formData.filesAttestationRC_Etranger],
@@ -485,13 +502,22 @@ export const useSupplierForm = () => {
           });
 
           // Append country-specific identifier fields
-          if (formData.country === 'MAROC') {
+          if (formData.country === 'MA') {
             form.append('ice', String(normalizedIce || ''));
             form.append('rc', String(formData.rc || ''));
             form.append('identifiantFiscal', String(formData.identifiantFiscal || ''));
-          } else if (formData.country === 'ETRANGER') {
+          } else if (formData.country === 'France') {
             form.append('siret', String(normalizedSiret || ''));
             form.append('tva', String(formData.tva || ''));
+          } else {
+            form.append('identifiantFiscal1', String(formData.identifiantFiscal1 || ''));
+            form.append('identifiantFiscal2', String(formData.identifiantFiscal2 || ''));
+          }
+
+          // Append attestation OCR data if available
+          if (formData.attestationRegulariteFiscaleData) {
+            form.append('attestationRegulariteFiscaleData', JSON.stringify(formData.attestationRegulariteFiscaleData));
+            console.log('📄 Données OCR attestation envoyées:', formData.attestationRegulariteFiscaleData);
           }
 
           // Append files from each category
@@ -532,6 +558,7 @@ export const useSupplierForm = () => {
           appendFiles(formData.filesICE, 'files', 'ICE');
           appendFiles(formData.filesIdentifiantFiscal, 'files', 'Identifiant Fiscal');
           appendFiles(formData.filesPresentationCommerciale, 'files', 'Présentation Commerciale');
+          appendFiles(formData.filesAttestationRegulariteFiscale, 'files', 'Attestation de Régularité Fiscale');
           appendFiles(formData.filesStatutMaroc, 'files', 'Statut');
           // Étranger files
           appendFiles(formData.filesAttestationAT, 'files', "Attestation d'assurance (AT)");
@@ -547,6 +574,7 @@ export const useSupplierForm = () => {
             ice: formData.filesICE.length,
             identifiantFiscal: formData.filesIdentifiantFiscal.length,
             presentationCommerciale: formData.filesPresentationCommerciale.length,
+            attestationRegulariteFiscale: formData.filesAttestationRegulariteFiscale.length,
             statutMaroc: formData.filesStatutMaroc.length,
             attestationAT: formData.filesAttestationAT.length,
             attestationRC_Etranger: formData.filesAttestationRC_Etranger.length,

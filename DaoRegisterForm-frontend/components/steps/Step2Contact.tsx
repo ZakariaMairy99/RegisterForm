@@ -1,4 +1,4 @@
-
+﻿
 import React from 'react';
 import { Input, Select } from '../FormComponents';
 import { SupplierFormData } from '../../types';
@@ -11,13 +11,13 @@ interface StepProps {
 
 export const Step2Contact: React.FC<StepProps> = ({ data, update, errors }) => {
   return (
-    <div className="animate-fade-in bg-app-surface p-6 md:p-8 rounded-2xl shadow-sm border border-app-border">
-      <div className="mb-5">
-        <h2 className="text-lg font-bold text-text-main">Contact principal de l’entreprise</h2>
-        <p className="text-xs text-text-muted mt-0.5">Personne à contacter pour la gestion du compte.</p>
+    <div className="bg-white p-6 md:p-10 rounded-2xl shadow-lg shadow-gray-100/50 border border-gray-100 animate-fade-in-up">
+      <div className="mb-8 pb-4 border-b border-gray-50">
+        <h2 className="text-2xl font-bold text-gray-900">Contact principal</h2>
+        <p className="text-sm text-gray-500 mt-1">Personne à contacter pour la gestion du compte.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
         <Select 
           label="Civilité" 
           required 
@@ -44,7 +44,7 @@ export const Step2Contact: React.FC<StepProps> = ({ data, update, errors }) => {
           error={errors?.contactPrenom}
         />
         <Input 
-          label="Téléphone mobile" 
+          label="Téléphone personnel" 
           type="tel"
           value={data.contactMobile}
           onChange={e => update('contactMobile', e.target.value)}
@@ -67,14 +67,20 @@ export const Step2Contact: React.FC<StepProps> = ({ data, update, errors }) => {
         />
         <Select 
           label="Choix de la langue" 
-          options={[{value: 'fr', label: 'Français'}, {value: 'en', label: 'Anglais'}]}
+          options={[
+            {value: 'FR', label: 'Français'}, 
+            {value: 'EN', label: 'Anglais'},
+            {value: 'AR', label: 'Arabe'}
+          ]}
           value={data.language}
           onChange={e => update('language', e.target.value)}
         />
         <div className="md:col-span-2">
           <Select 
             label="Fuseau horaire" 
-            options={[{value: 'WET', label: 'WET - Western European Time (Africa/Casablanca)'}]}
+            options={[
+              {value: 'WET - Western European Time', label: 'WET - Western European Time (Africa/Casablanca)'}
+            ]}
             value={data.timezone}
             onChange={e => update('timezone', e.target.value)}
           />

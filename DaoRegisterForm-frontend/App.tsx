@@ -56,44 +56,63 @@ function App() {
   return (
     <Layout currentStep={currentStep} logoUrl={logoUrl} logoName={logoName}>
       {!isConfirmationStep && (
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 pb-6 border-b border-gray-200 bg-white p-6 rounded-2xl shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
           <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-2 tracking-tight">Formulaire Fournisseur</h1>
-            <p className="text-sm text-gray-500 font-medium">Complétez les informations ci-dessous pour enregistrer votre entreprise.</p>
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Formulaire Fournisseur</h1>
+            <p className="text-gray-500 mt-1">Complétez les informations pour l'enregistrement.</p>
           </div>
           <div className="mt-4 md:mt-0">
             <button 
               type="button" 
               onClick={saveProgress}
-              className={`group px-5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm flex items-center gap-2 ${isSaved ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-white border border-gray-200 text-gray-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700'}`}>
-              <i className={`fas ${isSaved ? 'fa-check text-green-600' : 'fa-save text-gray-400'} transition-colors`}></i>
-              {isSaved ? 'Sauvegardé' : 'Sauvegarder'}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border ${
+                isSaved 
+                ? 'bg-green-50 border-green-200 text-green-700' 
+                : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600'
+              }`}
+            >
+              <i className={`fas ${isSaved ? 'fa-check text-green-500' : 'fa-save'} text-xs`}></i>
+              {isSaved ? 'Brouillon sauvegardé' : 'Sauvegarder'}
             </button>
           </div>
-        </header>
+        </div>
       )}
 
-      <form onSubmit={handleFormSubmit} className="flex flex-col flex-grow">
+      <form onSubmit={(e) => e.preventDefault()} className="flex flex-col flex-grow relative">
         {renderStep()}
 
         {!isConfirmationStep && (
-          <div className="flex justify-between mt-8 pt-6 border-t border-gray-200 sticky bottom-0 bg-gray-50/95 backdrop-blur-sm pb-6 z-10">
+          <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-100">
             <button 
               type="button"
               onClick={goToPrevStep}
               disabled={currentStep === 0}
-              className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${currentStep === 0 ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-800 shadow-sm'}`}
+              className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-colors flex items-center gap-2
+                ${currentStep === 0 
+                  ? 'text-gray-300 cursor-not-allowed' 
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                }`}
             >
-              <i className="fas fa-arrow-left text-sm"></i> Précédent
+              <i className="fas fa-arrow-left text-xs"></i> Précédent
             </button>
 
-            {!isLastStep && (
+            {!isLastStep ? (
               <button 
                 type="button"
                 onClick={goToNextStep}
-                className="px-6 py-2 bg-gray-900 text-white rounded-lg font-semibold hover:bg-black transition-all shadow-md shadow-gray-900/10 flex items-center gap-2 group text-sm"
+                className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-semibold shadow-lg shadow-blue-200 hover:bg-blue-700 hover:shadow-blue-300 transition-all flex items-center gap-2 group text-sm transform active:scale-95"
               >
-                Suivant <i className="fas fa-arrow-right text-sm group-hover:translate-x-1 transition-transform"></i>
+                Suivant <i className="fas fa-arrow-right text-xs group-hover:translate-x-0.5 transition-transform"></i>
+              </button>
+            ) : (
+             <button 
+                type="button"
+                onClick={submitForm}
+                disabled={isSubmitting}
+                className="px-6 py-2.5 bg-green-600 text-white rounded-xl font-semibold shadow-lg shadow-green-200 hover:bg-green-700 hover:shadow-green-300 transition-all flex items-center gap-2 group text-sm transform active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? <i className="fas fa-circle-notch fa-spin"></i> : <i className="fas fa-check"></i>}
+                Confirmer l'inscription
               </button>
             )}
           </div>
