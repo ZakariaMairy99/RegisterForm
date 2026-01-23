@@ -197,22 +197,61 @@ export const useSupplierForm = () => {
     // Validate a specific step and return a map of field -> error message
     const validateStep = (stepIndex: number): Record<string, string> => {
       const errs: Record<string, string> = {};
+      
+      // Validation Regex
+      // Email: standard strict pattern
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      // Phone: allows digits, spaces, dashes, +, parentheses. At least 6 chars. 
+      // Rejects letters to satisfy "juste les nombres" requirement (broadly interpreted as phone format)
+      const phoneRegex = /^[\d\s+\-()]{6,25}$/;
+
       if (stepIndex === 0) {
-        // Organization - required fields (those with asterisks)
+        // Step 1: Organization - required fields
         if (!formData.raisonSociale || formData.raisonSociale.trim() === '') errs.raisonSociale = 'Raison sociale est requise';
         if (!formData.formeJuridique || formData.formeJuridique.trim() === '') errs.formeJuridique = 'Forme juridique est requise';
-        // If user selected 'AUTRE', require the custom text
-        if (formData.formeJuridique === 'AUTRE' && (!formData.formeJuridiqueAutre || formData.formeJuridiqueAutre.trim() === '')) errs.formeJuridiqueAutre = 'Veuillez préciser la forme juridique';
+        
+        if (formData.formeJuridique === 'AUTRE' && (!formData.formeJuridiqueAutre || formData.formeJuridiqueAutre.trim() === '')) 
+          errs.formeJuridiqueAutre = 'Veuillez préciser la forme juridique';
+          
         if (!formData.address || formData.address.trim() === '') errs.address = 'Adresse est requise';
         if (!formData.postalCode || formData.postalCode.trim() === '') errs.postalCode = 'Code postal est requis';
         if (!formData.city || formData.city.trim() === '') errs.city = 'Ville est requise';
-        if (!formData.emailEntreprise || formData.emailEntreprise.trim() === '') errs.emailEntreprise = 'Email entreprise est requis';
+        
+        // Email Enterprise Validation
+        if (!formData.emailEntreprise || formData.emailEntreprise.trim() === '') {
+          errs.emailEntreprise = 'Email entreprise est requis';
+        } else if (!emailRegex.test(formData.emailEntreprise)) {
+          errs.emailEntreprise = 'Format email invalide (exemple@domaine.com)';
+        }
+
+        // Phone Validation (Optional but strict if present)
+        if (formData.phone && !phoneRegex.test(formData.phone)) {
+          errs.phone = 'Numéro invalide (Chiffres, espaces, + uniquement)';
+        }
+
       } else if (stepIndex === 1) {
-        // Contact - only 4 required fields (those with asterisks)
+        // Step 2: Contact - required fields
         if (!formData.civility || formData.civility.trim() === '') errs.civility = 'Civilité est requise';
         if (!formData.contactNom || formData.contactNom.trim() === '') errs.contactNom = 'Nom du contact est requis';
         if (!formData.contactPrenom || formData.contactPrenom.trim() === '') errs.contactPrenom = 'Prénom du contact est requis';
-        if (!formData.email || formData.email.trim() === '') errs.email = "Email principal est requis";
+        
+        // Contact Email Validation
+        if (!formData.email || formData.email.trim() === '') {
+          errs.email = "Email principal est requis";
+        } else if (!emailRegex.test(formData.email)) {
+          errs.email = 'Format email invalide';
+        }
+
+        // Contact Mobile Validation (Optional but strict if present)
+        if (formData.contactMobile && !phoneRegex.test(formData.contactMobile)) {
+          errs.contactMobile = 'Numéro mobile invalide';
+        }
+        
+        // Other Phone Validation
+        if (formData.otherPhone && !phoneRegex.test(formData.otherPhone)) {
+          errs.otherPhone = 'Numéro invalide';
+        }
+
       } else if (stepIndex === 2) {
         // Step 3 documents - all fields are now optional
       }

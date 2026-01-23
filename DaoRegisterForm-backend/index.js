@@ -8,6 +8,9 @@ const path = require('path');
 const jsforce = require('jsforce');
 const mindee = require('mindee');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Tesseract = require('tesseract.js');
+const { createCanvas } = require('@napi-rs/canvas');
+const sharp = require('sharp');
 require('dotenv').config();
 
 const app = express();
@@ -807,6 +810,276 @@ app.post('/api/supplier', upload.any(), async (req, res) => {
   }
 });
 
+// Tesseract OCR Route - Optimized for Render with PDF Support
+app.post('/api/ocr/analyze-tesseract', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    console.log('🔍 Starting Optimized Tesseract OCR analysis...');
+    console.log('File type:', req.file.mimetype);
+    
+    let imageBuffer = req.file.buffer;
+
+    // Si c'est un PDF, convertir la première page en image
+    if (req.file.mimetype === 'application/pdf') {
+      try {
+        console.log('📄 PDF detected - Converting to image...');
+        const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        
+        const loadingTask = pdfjs.getDocument({
+          data: new Uint8Array(req.file.buffer),
+          disableFontFace: true,
+          isEvalSupported: false
+        });
+
+        const pdf = await loadingTask.promise;
+        const page = await pdf.getPage(1); // Première page seulement
+        
+        const viewport = page.getViewport({ scale: 3.0 }); // Haute résolution (améliore la lisibilité)
+        const canvas = createCanvas(viewport.width, viewport.height);
+        const context = canvas.getContext('2d');
+
+        await page.render({
+          canvasContext: context,
+          viewport: viewport
+        }).promise;
+
+        imageBuffer = canvas.toBuffer('image/png');
+        // Prétraitement image pour OCR (grayscale + normalize + threshold + resize)
+        imageBuffer = await sharp(imageBuffer)
+          .resize(1800) // largeur cible pour lisibilité
+          .greyscale()
+          .normalize()
+          .threshold(160)
+          .toBuffer();
+        console.log('✅ PDF converted & preprocessed to PNG');
+      } catch (pdfError) {
+        console.error('PDF Conversion Error:', pdfError);
+        return res.status(500).json({ 
+          error: 'Erreur lors de la conversion du PDF. Essayez Gemini AI.' 
+        });
+      }
+    }
+    
+    // Timeout de sécurité (25 secondes)
+    const timeout = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('OCR timeout - document trop complexe')), 25000)
+    );
+
+    // Configuration optimisée pour Render (rapide + faible mémoire)
+    const ocrPromise = Tesseract.recognize(
+      imageBuffer,
+      'fra+eng', // French primary + English fallback
+      {
+        logger: info => {
+          if (info.status === 'recognizing text') {
+            console.log(`Progress: ${Math.round(info.progress * 100)}%`);
+          }
+        },
+        // Paramètres optimisés pour performance
+        tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+        tessedit_ocr_engine_mode: Tesseract.OEM.DEFAULT,
+        // Inclure xXvV et crochets pour détecter les cases cochées; conserver les espaces
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789éèêëàâäùûüôöîïç °/-:.,|[]xXvV',
+        preserve_interword_spaces: '1'
+      }
+    );
+
+    const { data: { text } } = await Promise.race([ocrPromise, timeout]);
+
+    console.log('--- TEXTE EXTRAIT TESSERACT ---');
+    console.log(text);
+    console.log('--------------------------------');
+
+    // Helpers
+    const stripDiacritics = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const cleanDigits = s => (s || '').replace(/[^0-9]/g, '');
+    
+    const linesRaw = text.split(/\r?\n/);
+    const lines = linesRaw.map(l => l.trim()).filter(Boolean);
+    const normLines = lines.map(l => stripDiacritics(l.toLowerCase()));
+
+    // Only return the fields required by Salesforce mapping
+    const results = {
+      numero_attestation: "",
+      numero_d_identification_fiscale: "",
+      ice: "",
+      registre_de_commerce: "",
+      taxe_professionnelle: "",
+      date_reception: "",
+      date_edition: "",
+      statut_regularite: false,
+      statut_garanties: false,
+      nest_pas_en_regle: false
+    };
+
+    // 1. ICE (15 chiffres) - prefer contextual lines
+    let iceMatch = null;
+    for (let i = 0; i < normLines.length; i++) {
+      if (normLines[i].includes('ice')) {
+        const digits = cleanDigits(lines[i]);
+        if (digits.length >= 15) {
+          // take first 15-digit sequence
+          const m = digits.match(/\d{15}/);
+          if (m) { iceMatch = m[0]; break; }
+        }
+      }
+    }
+    if (!iceMatch) {
+      const m = text.match(/ICE[\s:\-]*([0-9\s]{10,})/i);
+      if (m) {
+        const digits = cleanDigits(m[1]);
+        const seq = digits.match(/\d{15}/);
+        if (seq) iceMatch = seq[0];
+      }
+    }
+    if (!iceMatch) {
+      const any15 = text.match(/\b\d{15}\b/);
+      if (any15) iceMatch = any15[0];
+    }
+    if (iceMatch) results.ice = iceMatch;
+
+    // 2. RC
+    let rcMatch = null;
+    for (let i = 0; i < normLines.length; i++) {
+      if (normLines[i].includes('registre de commerce') || normLines[i].includes('r.c')) {
+        const digits = cleanDigits(lines[i]);
+        const m = digits.match(/\d{3,10}/);
+        if (m) { rcMatch = m[0]; break; }
+      }
+    }
+    if (!rcMatch) {
+      const m = text.match(/registre\s*de\s*commerce\D*(\d{3,10})/i) || text.match(/R\.?C\D*(\d{3,10})/i);
+      if (m) rcMatch = m[1];
+    }
+    if (rcMatch) results.registre_de_commerce = rcMatch;
+
+    // 3. IF (Identifiant Fiscal)
+    let ifMatch = null;
+    for (let i = 0; i < normLines.length; i++) {
+      if (normLines[i].includes('identification fiscale') || normLines[i].includes('i.f')) {
+        const digits = cleanDigits(lines[i]);
+        const m = digits.match(/\d{6,12}/);
+        if (m) { ifMatch = m[0]; break; }
+      }
+    }
+    if (!ifMatch) {
+      const m = text.match(/identification\s*fiscale\D*(\d{6,12})/i) || text.match(/I\.?F\D*(\d{6,12})/i);
+      if (m) ifMatch = m[1];
+    }
+    if (ifMatch) results.numero_d_identification_fiscale = ifMatch;
+
+    // 4. Taxe Pro
+    let tpMatch = null;
+    for (let i = 0; i < normLines.length; i++) {
+      if (normLines[i].includes('taxe professionnelle') || normLines[i].includes('t.p')) {
+        const digits = cleanDigits(lines[i]);
+        const m = digits.match(/\d{5,12}/);
+        if (m) { tpMatch = m[0]; break; }
+      }
+    }
+    if (!tpMatch) {
+      const m = text.match(/Taxe\s*Professionnelle\D*(\d{5,12})/i) || text.match(/T\.?P\D*(\d{5,12})/i);
+      if (m) tpMatch = m[1];
+    }
+    if (tpMatch) results.taxe_professionnelle = tpMatch;
+
+    // 5. Numéro Attestation (pipe-separated or labeled) - avoid OCR '/' confusion turning into '1'
+    let attMatch = null;
+    for (let i = 0; i < normLines.length; i++) {
+      if (normLines[i].includes('attestation') || normLines[i].includes('numero') || normLines[i].includes('n°')) {
+        const m = lines[i].match(/([0-9]{2,}(?:\|[0-9]+)+)/);
+        if (m) { attMatch = m[1]; break; }
+      }
+    }
+    if (!attMatch) {
+      const m = text.match(/\b(?:N[°o]|No|Numéro)\s*[:\-]?\s*([0-9]{2,}(?:\|[0-9]+)+)/i) 
+                || text.match(/N°\s*([\d|]+)/i) 
+                || text.match(/attestation\s*[n°]*\s*([\d|]+)/i);
+      if (m) attMatch = m[1];
+    }
+    if (attMatch && !/1\//.test(attMatch)) {
+      results.numero_attestation = attMatch;
+    }
+
+    // 6. Dates (context-aware)
+    const datePattern = /(\d{2})[-\/.](\d{2})[-\/.](\d{4})/;
+    let dateReception = null;
+    let dateEdition = null;
+    for (let i = 0; i < normLines.length; i++) {
+      const m = lines[i].match(datePattern);
+      if (!m) continue;
+      const d = `${m[3]}-${m[2]}-${m[1]}`;
+      const L = normLines[i];
+      if (L.includes('date de reception') || L.includes('reception')) {
+        dateReception = d;
+      } else if (L.includes('date d edition') || L.includes('edition')) {
+        dateEdition = d;
+      }
+    }
+    // Fallback: first two dates in document
+    if (!dateReception || !dateEdition) {
+      const allDates = text.match(/\d{2}[-\/.]\d{2}[-\/.]\d{4}/g);
+      if (allDates && allDates.length >= 1 && !dateReception) {
+        const m = allDates[0].match(datePattern);
+        dateReception = `${m[3]}-${m[2]}-${m[1]}`;
+      }
+      if (allDates && allDates.length >= 2 && !dateEdition) {
+        const m = allDates[1].match(datePattern);
+        dateEdition = `${m[3]}-${m[2]}-${m[1]}`;
+      }
+    }
+    if (dateReception) results.date_reception = dateReception.replace(/[/.]/g, '-');
+    if (dateEdition) results.date_edition = dateEdition.replace(/[/.]/g, '-');
+
+    // 7. Statut régularité / garanties / non-conformité via checkboxes or explicit phrases
+    const checkboxMarkers = ['x', 'v', '[x]', '[v]', '✓', '☑'];
+    const hasMarker = (line) => checkboxMarkers.some(m => line.toLowerCase().includes(m));
+
+    for (let i = 0; i < linesRaw.length; i++) {
+      const raw = linesRaw[i].trim();
+      const lower = raw.toLowerCase();
+      // En règle
+      if (lower.includes('en regle') || lower.includes('réguliere') || lower.includes('reguliere')) {
+        if (hasMarker(lower)) results.statut_regularite = true;
+      }
+      // Garanties suffisantes
+      if (lower.includes('garanties suffis') || lower.includes('constitue des garanties')) {
+        if (hasMarker(lower)) results.statut_garanties = true;
+      }
+      // N'est pas en règle (checkbox line)
+      if (lower.includes("n'est pas en regle") || lower.includes('nest pas en regle')) {
+        if (hasMarker(lower)) results.nest_pas_en_regle = true;
+      }
+    }
+
+    // Fallback on phrases if checkboxes not detected
+    if (!results.statut_regularite && (/situation\s*fiscale\s*r[ée]guli[èe]re/i.test(text) || /en\s*r[èe]gle/i.test(text))) {
+      results.statut_regularite = true;
+    }
+    if (!results.statut_garanties && (/garanti?es?\s*suffisantes?/i.test(text) || /constitu[ée]\s*des\s*garanties/i.test(text))) {
+      results.statut_garanties = true;
+    }
+    if (!results.nest_pas_en_regle && (/n['’]est\s*pas\s*en\s*r[èe]gle/i.test(text) || /non\s*r[èe]gulier/i.test(text))) {
+      results.nest_pas_en_regle = true;
+    }
+
+    console.log('✅ Tesseract OCR Results:', results);
+    res.json(results);
+
+  } catch (error) {
+    console.error('Tesseract Error:', error);
+    if (error.message.includes('timeout')) {
+      return res.status(408).json({ 
+        error: 'Délai dépassé. Le document est trop complexe. Réessayez avec un fichier plus léger.' 
+      });
+    }
+    res.status(500).json({ error: 'Erreur lors de l\'analyse OCR: ' + error.message });
+  }
+});
+
 // Gemini OCR Route
 app.post('/api/ocr/analyze', upload.single('file'), async (req, res) => {
   try {
@@ -822,11 +1095,29 @@ app.post('/api/ocr/analyze', upload.single('file'), async (req, res) => {
 
     // Initialize Gemini
     const genAI = new GoogleGenerativeAI(apiKey);
-    // Use a model that supports vision. 
-    // Use the model defined in .env or fallback to "gemini-1.5-flash"
-    const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-    console.log(`[OCR] Using Gemini Model: ${modelName}`);
-    const model = genAI.getGenerativeModel({ model: modelName });
+    // Try models in order of preference and availability
+    const modelsToTry = [
+      process.env.GEMINI_MODEL,
+      "gemini-1.5-flash-latest",
+      "gemini-1.5-flash",
+      "gemini-2.0-flash-exp"
+    ].filter(Boolean);
+    
+    let model = null;
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`[OCR] Tentative avec modèle: ${modelName}`);
+        model = genAI.getGenerativeModel({ model: modelName });
+        console.log(`[OCR] Modèle sélectionné: ${modelName}`);
+        break;
+      } catch (e) {
+        console.warn(`[OCR] Modèle ${modelName} indisponible, essai suivant...`);
+      }
+    }
+    
+    if (!model) {
+      return res.status(500).json({ error: 'Aucun modèle Gemini disponible. Vérifiez votre quota API.' });
+    }
 
     // Prepare image data
     const imagePart = {
@@ -873,8 +1164,28 @@ app.post('/api/ocr/analyze', upload.single('file'), async (req, res) => {
       return res.status(500).json({ error: 'Erreur lors de l\'analyse du document (Format invalide)' });
     }
 
-    console.log('Formatted result:', jsonResult);
-    res.json(jsonResult);
+    // Whitelist only the allowed fields
+    const allowedKeys = [
+      'numero_attestation',
+      'numero_d_identification_fiscale',
+      'ice',
+      'registre_de_commerce',
+      'taxe_professionnelle',
+      'date_reception',
+      'date_edition',
+      'statut_regularite',
+      'statut_garanties',
+      'nest_pas_en_regle'
+    ];
+    const filtered = {};
+    allowedKeys.forEach(k => {
+      if (Object.prototype.hasOwnProperty.call(jsonResult, k)) {
+        filtered[k] = jsonResult[k];
+      }
+    });
+
+    console.log('Formatted result (filtered):', filtered);
+    res.json(filtered);
 
   } catch (error) {
     console.error('Gemini Error:', error);

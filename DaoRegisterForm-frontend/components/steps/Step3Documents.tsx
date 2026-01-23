@@ -47,7 +47,7 @@ export const Step3Documents: React.FC<StepProps> = ({ data, update, errors }) =>
     update(category, `${newCategoryMetrics['2026']},${newCategoryMetrics['2025']},${newCategoryMetrics['2024']}`);
   };
 
-  const handleScan = async () => {
+  const handleScan = async (mode: 'gemini' | 'tesseract' = 'gemini') => {
     if (!data.filesAttestationRegulariteFiscale || data.filesAttestationRegulariteFiscale.length === 0) {
       alert("Veuillez d'abord télécharger l'Attestation de Régularité Fiscale.");
       return;
@@ -60,7 +60,9 @@ export const Step3Documents: React.FC<StepProps> = ({ data, update, errors }) =>
 
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/api/ocr/analyze`, {
+      const endpoint = mode === 'gemini' ? '/api/ocr/analyze' : '/api/ocr/analyze-tesseract';
+      
+      const response = await fetch(`${apiUrl}${endpoint}`, {
         method: 'POST',
         body: formData,
       });
@@ -217,33 +219,39 @@ export const Step3Documents: React.FC<StepProps> = ({ data, update, errors }) =>
                 
                 {/* Boutons Scanner et Voir */}
                 <div className="mt-3 flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={handleScan}
-                    disabled={isScanning || !data.filesAttestationRegulariteFiscale?.length}
-                    className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      isScanning || !data.filesAttestationRegulariteFiscale?.length
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow'
-                    }`}
-                  >
-                    {isScanning ? (
-                      <>
-                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                        </svg>
-                        <span>Analyse en cours...</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                        </svg>
-                        <span>Scanner le document</span>
-                      </>
-                    )}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleScan('tesseract')}
+                      disabled={isScanning || !data.filesAttestationRegulariteFiscale?.length}
+                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        isScanning || !data.filesAttestationRegulariteFiscale?.length
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-green-600 text-white hover:bg-green-700 shadow-sm hover:shadow'
+                      }`}
+                      title="Scanner OCR Tesseract (tous formats)"
+                    >
+                      {isScanning ? '⏳ Analyse...' : '✅ Scanner Tesseract'}
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => handleScan('gemini')}
+                      disabled={isScanning || !data.filesAttestationRegulariteFiscale?.length}
+                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        isScanning || !data.filesAttestationRegulariteFiscale?.length
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow'
+                      }`}
+                      title="Scanner Gemini AI (tous formats)"
+                    >
+                      {isScanning ? '⏳ Analyse...' : '☁️ Scanner Gemini'}
+                    </button>
+                  </div>
+                  
+                  <p className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+                    💡 <strong>Les deux options supportent PDF et images.</strong> Tesseract est plus rapide, Gemini est plus précis.
+                  </p>
                   
                   {ocrResult && (
                     <button
